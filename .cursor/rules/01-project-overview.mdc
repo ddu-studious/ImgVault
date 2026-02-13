@@ -1,0 +1,149 @@
+---
+alwaysApply: true
+---
+# ImgVault - 项目概览
+
+## 项目信息
+
+- **项目名称**: ImgVault (图片存储/查询服务)
+- **版本**: v2.0.0
+- **创建日期**: 2026
+- **项目类型**: Java Spring Boot 多模块后端项目
+
+## 项目简介
+
+本项目是一个**统一图片存储与查询服务**，为业务系统提供图片上传、存储、处理、检索和分发能力。主要包括：
+
+- **图片上传服务**：支持普通上传、预签名直传、分片上传、断点续传、秒传
+- **图片处理服务**：缩略图生成、水印添加、格式转换、图片压缩
+- **图片查询服务**：多维检索（ID/标签/日期/格式/相册）
+- **管理后台**：图片浏览、搜索、审核、统计
+- **异步任务服务**：处理图片处理等异步任务
+
+## 核心功能模块
+
+### imgvault-api
+- **对外 API 服务**
+- 提供图片上传/下载/查询/处理等 RESTful API
+- 支持预签名 URL 客户端直传
+
+### imgvault-admin
+- **管理后台服务**
+- 图片资源管理和审核
+- 数据统计和监控
+
+### imgvault-task
+- **异步任务服务**
+- 缩略图生成、格式转换等异步处理
+- 消费 RocketMQ 消息
+
+## 技术栈
+
+### 后端
+- **框架**: Spring Boot 2.7.x + Spring Cloud 2021.0.5
+- **Java 版本**: Java 8
+- **架构**: DDD (领域驱动设计)
+- **对象存储**: MinIO 8.5.x (S3 兼容)
+- **数据库**: MySQL 8.0
+- **缓存**: Redis 6.x
+- **消息队列**: RocketMQ 4.9.x
+- **ORM**: MyBatis 3.5.x
+- **对象映射**: MapStruct 1.5.2
+- **API 文档**: SpringDoc OpenAPI 1.7.x
+
+### 图片处理
+- Thumbnailator 0.4.20 (缩略图/水印/裁剪/压缩)
+- TwelveMonkeys ImageIO 3.10.x (格式扩展: WebP/TIFF)
+- metadata-extractor 2.19.x (EXIF 元数据提取)
+- JImageHash 1.0.0 (感知哈希去重)
+
+### 主要依赖
+- Lombok 1.18.20
+- FastJson 1.2.83
+- Commons Lang3 / Collections4
+- Caffeine Cache
+
+## 目录结构
+
+```
+ImgVault/
+├── .cursor/                           # Cursor AI 开发配置
+│   ├── rules/                         # 开发规则 (MDC 格式)
+│   │   ├── 01-project-overview.mdc    # 项目概览
+│   │   └── 02-documentation.mdc       # 文档管理规范
+│   └── commands/                      # 命令脚本
+│       ├── important-context.md       # 项目上下文
+│       └── mcpcommands.md             # MCP 命令快捷方式
+├── docs/                              # 项目文档
+│   ├── README.md                      # 文档索引
+│   ├── architecture/                  # 架构文档
+│   ├── requirements/                  # 需求文档
+│   ├── research/                      # 调研文档
+│   ├── guides/                        # 使用指南
+│   ├── api/                           # API 文档
+│   └── changelog/                     # 变更日志
+├── sql/                               # SQL 脚本
+├── docker-compose.yml                 # 开发环境 Docker 编排
+├── imgvault-api/                      # API 服务
+├── imgvault-admin/                    # 管理后台服务
+├── imgvault-app/                      # 应用层
+├── imgvault-common/                   # 公共模块 (DTO/枚举/工具类)
+├── imgvault-domain/                   # 领域层 (核心业务逻辑)
+├── imgvault-infrastructure/           # 基础设施层
+└── imgvault-task/                     # 异步任务服务
+```
+
+## 核心模块说明
+
+| 模块 | 说明 |
+|------|------|
+| `imgvault-api` | 对外 API 服务，图片上传/下载/查询 |
+| `imgvault-admin` | 管理后台，图片管理/审核/统计 |
+| `imgvault-app` | 应用层，业务编排和流程协调 |
+| `imgvault-common` | 公共模块，DTO/枚举/工具类 |
+| `imgvault-domain` | 领域层，核心业务逻辑和聚合根 |
+| `imgvault-infrastructure` | 基础设施层，MinIO/MySQL/Redis/RocketMQ 封装 |
+| `imgvault-task` | 异步任务服务，图片处理消费者 |
+
+## 数据库设计
+
+### 核心表
+- `img_image` - 图片主表（元数据、存储路径、状态）
+- `img_metadata` - EXIF 元数据表
+- `img_tag` / `img_image_tag` - 标签及关联
+- `img_album` / `img_album_image` - 相册及关联
+- `img_thumbnail` - 缩略图表
+- `img_upload_task` - 分片上传任务表
+- `file_fingerprint` - 文件指纹表（秒传用）
+
+## MinIO 存储结构
+
+```
+imgvault/                    # Bucket
+├── originals/              # 原图 (按日期: 2026/02/10/{uuid}.jpg)
+├── thumbnails/             # 缩略图 (small/medium/large)
+├── watermarked/            # 水印图
+├── temp/                   # 分片上传临时存储
+└── avatars/                # 头像 (业务扩展)
+```
+
+## 服务端口
+
+| 服务 | HTTP 端口 | 管理端口 |
+|------|----------|---------|
+| API | 8080 | 8899 |
+| Admin | 8082 | 8890 |
+| Task | 8084 | 8892 |
+
+## 重要提示
+
+1. **文档管理**: 所有文档必须放在 `docs/` 目录下
+2. **代码规范**: 参考 `.cursor/rules/` 下的规范文件
+3. **分支管理**: 开发分支格式 `feature-*`
+4. **图片命名**: 使用 UUID 命名，不暴露原始文件名
+5. **异步处理**: 图片处理任务通过 RocketMQ 异步执行
+6. **安全校验**: 所有上传必须经过 Magic Bytes + 类型白名单校验
+
+---
+
+**最后更新**: 2026-02-10

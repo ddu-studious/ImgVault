@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.FileFingerprintMapper">
+
+    <resultMap id="fingerprintResultMap" type="com.imgvault.domain.entity.FileFingerprintEntity">
+        <id column="id" property="id"/>
+        <result column="file_hash" property="fileHash"/>
+        <result column="file_md5" property="fileMd5"/>
+        <result column="storage_path" property="storagePath"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="ref_count" property="refCount"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="findByHash" resultMap="fingerprintResultMap">
+        SELECT * FROM file_fingerprint WHERE file_hash = #{fileHash}
+    </select>
+
+    <select id="findByMd5" resultMap="fingerprintResultMap">
+        SELECT * FROM file_fingerprint WHERE file_md5 = #{fileMd5}
+    </select>
+
+    <insert id="insert" parameterType="com.imgvault.domain.entity.FileFingerprintEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO file_fingerprint (file_hash, file_md5, storage_path, file_size)
+        VALUES (#{fileHash}, #{fileMd5}, #{storagePath}, #{fileSize})
+    </insert>
+
+    <update id="incrementRefCount">
+        UPDATE file_fingerprint SET ref_count = ref_count + 1 WHERE id = #{id}
+    </update>
+
+    <update id="decrementRefCount">
+        UPDATE file_fingerprint SET ref_count = ref_count - 1 WHERE id = #{id}
+    </update>
+</mapper>

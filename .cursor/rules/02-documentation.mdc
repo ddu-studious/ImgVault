@@ -1,0 +1,308 @@
+---
+alwaysApply: true
+---
+# 文档管理规范
+
+## 核心规则
+
+**所有 Markdown 文档（除 README.md）必须放在 `docs/` 目录下！**
+
+```
+✅ 正确: docs/architecture/xxx.md
+✅ 正确: docs/research/xxx.md
+✅ 正确: docs/guides/xxx.md
+✅ 正确: README.md (根目录唯一允许的 .md 文件)
+
+❌ 错误: xxx.md (根目录)
+❌ 错误: imgvault-api/xxx.md
+❌ 错误: sql/xxx.md
+```
+
+---
+
+## 文档目录结构
+
+```
+docs/
+├── README.md                  # 文档索引
+├── architecture/              # 架构文档
+│   ├── SYSTEM_ARCHITECTURE_OVERVIEW.md
+│   ├── DATA_MODEL_RELATIONSHIPS.md
+│   ├── STORAGE_ARCHITECTURE.md
+│   └── QUICK_START.md
+├── requirements/              # 需求文档
+│   └── v版本号-功能名称.md
+├── research/                  # 调研文档
+│   └── image-storage-service-research.md
+├── guides/                    # 使用指南
+│   └── 主题.md
+├── api/                       # API 文档
+│   └── 接口文档.md
+└── changelog/                 # 变更日志
+    └── CHANGELOG.md
+```
+
+---
+
+## 文档分类说明
+
+| 目录 | 用途 | 命名规范 |
+|-----|------|---------|
+| `architecture/` | 架构设计文档 | `大写主题.md` |
+| `requirements/` | 需求文档 | `v版本号-功能名称.md` |
+| `research/` | 调研文档 | `主题-research.md` 或 `主题-prd.md` |
+| `guides/` | 使用指南 | `主题.md` |
+| `api/` | API 接口文档 | `主题.md` |
+| `changelog/` | 变更日志 | `CHANGELOG.md` |
+
+---
+
+## 命名规范
+
+### 需求文档
+
+```
+v{major}.{minor}.{patch}-{功能名称}.md
+
+示例:
+v2.0.0-图片存储查询服务.md
+v2.1.0-图片审核功能.md
+v2.2.0-CDN集成.md
+```
+
+### 架构文档
+
+```
+大写字母_下划线分隔.md
+
+示例:
+SYSTEM_ARCHITECTURE_OVERVIEW.md
+DATA_MODEL_RELATIONSHIPS.md
+STORAGE_ARCHITECTURE.md
+QUICK_START.md
+```
+
+### 调研文档
+
+```
+主题-research.md 或 主题-prd.md
+
+示例:
+image-storage-service-research.md
+cdn-solution-research.md
+image-processing-prd.md
+```
+
+### 变更日志
+
+```markdown
+# 变更日志
+
+## [2.0.0] - 2026-02-10
+### 新增
+- 功能描述
+
+### 修复
+- Bug 修复描述
+
+### 变更
+- 变更说明
+```
+
+---
+
+## 文档创建流程
+
+### 新增功能
+
+```bash
+# 1. 创建调研文档（可选，复杂功能推荐）
+docs/research/新功能-research.md
+
+# 2. 创建需求文档
+docs/requirements/v2.1.0-新功能需求.md
+
+# 3. 开发完成后更新架构文档（如需要）
+docs/architecture/相关架构文档.md
+
+# 4. 更新变更日志
+docs/changelog/CHANGELOG.md
+
+# 5. 创建使用指南（如需要）
+docs/guides/新功能使用指南.md
+```
+
+---
+
+## 文档模板
+
+### 需求文档模板
+
+```markdown
+# [功能名称] 需求文档
+
+**版本**: v2.1.0  
+**创建日期**: 2026-02-10  
+**状态**: 规划中/开发中/已完成
+
+## 需求背景
+
+描述需求的背景和动机...
+
+## 需求目标
+
+描述要实现的目标...
+
+## 功能需求
+
+### P0 - 核心功能
+
+| ID | 功能 | 说明 |
+|----|-----|------|
+| F1 | xxx | xxx |
+
+### P1 - 重要功能
+
+| ID | 功能 | 说明 |
+|----|-----|------|
+| F2 | xxx | xxx |
+
+## 技术方案
+
+描述技术实现方案...
+
+## 验收标准
+
+- [ ] 标准1
+- [ ] 标准2
+
+---
+
+**最后更新**: 2026-02-10
+```
+
+### 调研文档模板
+
+```markdown
+# [主题] 技术调研
+
+**版本**: v1.0  
+**创建日期**: 2026-02-10  
+**状态**: 调研中/已完成
+
+## 调研背景
+
+描述调研的背景和目的...
+
+## 候选方案
+
+### 方案 A: xxx
+- 优势: ...
+- 劣势: ...
+
+### 方案 B: xxx
+- 优势: ...
+- 劣势: ...
+
+## 对比分析
+
+| 维度 | 方案 A | 方案 B |
+|------|--------|--------|
+| 性能 | ... | ... |
+| 成本 | ... | ... |
+
+## 推荐方案
+
+推荐选择方案 X，理由如下...
+
+---
+
+**文档版本**: 1.0  
+**创建时间**: 2026-02-10  
+**维护者**: ImgVault Team
+```
+
+### 架构文档模板
+
+```markdown
+# 架构/设计文档标题
+
+## 概述
+
+简要描述文档内容...
+
+## 核心设计
+
+### 架构图
+
+使用 Mermaid 或 ASCII 图表描述...
+
+### 核心组件
+
+组件说明...
+
+## 数据流转
+
+流程说明...
+
+## 注意事项
+
+重要提示...
+
+---
+
+**文档版本**: 1.0  
+**创建时间**: 2026-02-10  
+**维护者**: ImgVault Team
+```
+
+---
+
+## 强制规则
+
+### DO ✅
+
+1. ✅ 所有文档放在 `docs/` 目录下
+2. ✅ 遵循目录分类
+3. ✅ 使用规范的命名格式
+4. ✅ 文档末尾添加更新日期
+5. ✅ 新功能先写需求文档再开发
+6. ✅ 复杂功能先做技术调研
+7. ✅ 使用 Markdown 格式
+8. ✅ 代码块标注语言类型
+
+### DON'T ❌
+
+1. ❌ **绝对禁止**在根目录创建 .md 文件（README.md 除外）
+2. ❌ 不要在模块目录下创建文档
+3. ❌ 不要使用中文日期格式（用 2026-02-10）
+4. ❌ 不要创建临时文档
+5. ❌ 不要跳过需求文档直接开发
+
+---
+
+## 文档同步检查
+
+当以下情况发生时，必须检查文档是否需要更新：
+
+1. **新增功能** → 更新需求文档、CHANGELOG.md
+2. **修改 API** → 更新 API 文档
+3. **数据结构变更** → 更新架构文档
+4. **配置变更** → 更新相关指南
+5. **架构变更** → 更新架构文档
+6. **存储策略变更** → 更新存储架构文档
+
+---
+
+## 现有文档清单
+
+### 调研文档 (docs/research/)
+- `image-storage-service-research.md` - 图片存储/查询服务技术调研（Java 生态）
+- `image-service-language-comparison-research.md` - 多语言图片服务方案对比调研（Go/Rust/Python/C++）
+
+### 需求文档 (docs/requirements/)
+- `v2.0.0-图片存储查询服务.md` - 图片存储查询服务需求文档
+
+---
+
+**最后更新**: 2026-02-10

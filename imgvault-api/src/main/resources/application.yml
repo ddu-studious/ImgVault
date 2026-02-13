@@ -1,0 +1,103 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: imgvault-api
+  profiles:
+    active: dev
+
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+      file-size-threshold: 2MB
+
+  # SQLite 数据源
+  datasource:
+    url: jdbc:sqlite:data/imgvault.db
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+      connection-init-sql: >
+        PRAGMA journal_mode=WAL;
+        PRAGMA synchronous=NORMAL;
+        PRAGMA foreign_keys=ON;
+        PRAGMA busy_timeout=5000;
+
+  # Caffeine 缓存
+  cache:
+    type: caffeine
+    cache-names: imageCache,fingerprintCache,tagCache
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=30m,expireAfterAccess=10m,recordStats
+
+  # 异步任务
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
+      thread-name-prefix: imgvault-async-
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.imgvault.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# MinIO 配置
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: imgvault
+  region: us-east-1
+
+# imgproxy 配置
+imgproxy:
+  base-url: http://localhost:8081
+  key: 943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
+  salt: 520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
+
+# Actuator 健康检查
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+
+# 日志
+logging:
+  level:
+    com.imgvault: DEBUG
+    org.mybatis: DEBUG
+    org.springframework.cache: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# 应用自定义配置
+imgvault:
+  storage:
+    original-prefix: originals
+    temp-prefix: temp
+    avatar-prefix: avatars
+  upload:
+    allowed-types: image/jpeg,image/png,image/gif,image/webp,image/bmp
+    max-file-size: 52428800  # 50MB
+  image:
+    thumbnail-sizes:
+      small: 150x150
+      medium: 800x600
+      large: 1920x1080

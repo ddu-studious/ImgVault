@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.ImageMapper">
+
+    <resultMap id="imageResultMap" type="com.imgvault.domain.entity.ImageEntity">
+        <id column="id" property="id"/>
+        <result column="image_uuid" property="imageUuid"/>
+        <result column="file_hash" property="fileHash"/>
+        <result column="file_md5" property="fileMd5"/>
+        <result column="original_name" property="originalName"/>
+        <result column="storage_path" property="storagePath"/>
+        <result column="bucket_name" property="bucketName"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="width" property="width"/>
+        <result column="height" property="height"/>
+        <result column="format" property="format"/>
+        <result column="mime_type" property="mimeType"/>
+        <result column="color_space" property="colorSpace"/>
+        <result column="has_alpha" property="hasAlpha"/>
+        <result column="uploader_id" property="uploaderId"/>
+        <result column="upload_source" property="uploadSource"/>
+        <result column="status" property="status"/>
+        <result column="access_level" property="accessLevel"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="description" property="description"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted_at" property="deletedAt"/>
+    </resultMap>
+
+    <sql id="allColumns">
+        id, image_uuid, file_hash, file_md5, original_name, storage_path, bucket_name,
+        file_size, width, height, format, mime_type, color_space, has_alpha,
+        uploader_id, upload_source, status, access_level, view_count, description,
+        created_at, updated_at, deleted_at
+    </sql>
+
+    <insert id="insert" parameterType="com.imgvault.domain.entity.ImageEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_image (image_uuid, file_hash, file_md5, original_name, storage_path,
+                               bucket_name, file_size, width, height, format, mime_type,
+                               color_space, has_alpha, uploader_id, upload_source,
+                               status, access_level, description)
+        VALUES (#{imageUuid}, #{fileHash}, #{fileMd5}, #{originalName}, #{storagePath},
+                #{bucketName}, #{fileSize}, #{width}, #{height}, #{format}, #{mimeType},
+                #{colorSpace}, #{hasAlpha}, #{uploaderId}, #{uploadSource},
+                #{status}, #{accessLevel}, #{description})
+    </insert>
+
+    <select id="findById" resultMap="imageResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM img_image
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByUuid" resultMap="imageResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM img_image
+        WHERE image_uuid = #{imageUuid}
+    </select>
+
+    <select id="findByHash" resultMap="imageResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM img_image
+        WHERE file_hash = #{fileHash} AND status = 1
+        LIMIT 1
+    </select>
+
+    <select id="findPage" resultMap="imageResultMap">
+        SELECT <include refid="allColumns"/>
+        FROM img_image
+        WHERE status = #{status}
+        <if test="format != null and format != ''">
+            AND format = #{format}
+        </if>
+        ORDER BY
+        <choose>
+            <when test="sortBy == 'file_size'">file_size</when>
+            <when test="sortBy == 'width'">width</when>
+            <when test="sortBy == 'height'">height</when>
+            <when test="sortBy == 'view_count'">view_count</when>
+            <when test="sortBy == 'updated_at'">updated_at</when>
+            <otherwise>created_at</otherwise>
+        </choose>
+        <choose>
+            <when test="sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM img_image
+        WHERE status = #{status}
+        <if test="format != null and format != ''">
+            AND format = #{format}
+        </if>
+    </select>
+
+    <update id="updateStatus">
+        UPDATE img_image SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <update id="softDelete">
+        UPDATE img_image SET status = 0, deleted_at = datetime('now') WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM img_image WHERE id = #{id}
+    </delete>
+
+    <update id="updateDescription">
+        UPDATE img_image SET description = #{description} WHERE id = #{id}
+    </update>
+
+    <update id="incrementViewCount">
+        UPDATE img_image SET view_count = view_count + 1 WHERE id = #{id}
+    </update>
+</mapper>

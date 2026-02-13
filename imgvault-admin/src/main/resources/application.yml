@@ -1,0 +1,54 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: imgvault-admin
+  profiles:
+    active: dev
+
+  # SQLite 数据源（共享同一个数据库文件）
+  datasource:
+    url: jdbc:sqlite:data/imgvault.db
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+      connection-init-sql: >
+        PRAGMA journal_mode=WAL;
+        PRAGMA synchronous=NORMAL;
+        PRAGMA foreign_keys=ON;
+        PRAGMA busy_timeout=5000;
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=30m
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.imgvault.domain.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: imgvault
+  region: us-east-1
+
+imgproxy:
+  base-url: http://localhost:8081
+  key: 943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
+  salt: 520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.imgvault: DEBUG

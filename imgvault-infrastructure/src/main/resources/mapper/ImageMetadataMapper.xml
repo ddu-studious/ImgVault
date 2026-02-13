@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.ImageMetadataMapper">
+
+    <resultMap id="metadataResultMap" type="com.imgvault.domain.entity.ImageMetadataEntity">
+        <id column="id" property="id"/>
+        <result column="image_id" property="imageId"/>
+        <result column="camera_make" property="cameraMake"/>
+        <result column="camera_model" property="cameraModel"/>
+        <result column="lens_model" property="lensModel"/>
+        <result column="focal_length" property="focalLength"/>
+        <result column="aperture" property="aperture"/>
+        <result column="shutter_speed" property="shutterSpeed"/>
+        <result column="iso" property="iso"/>
+        <result column="taken_at" property="takenAt"/>
+        <result column="gps_latitude" property="gpsLatitude"/>
+        <result column="gps_longitude" property="gpsLongitude"/>
+        <result column="orientation" property="orientation"/>
+        <result column="raw_exif" property="rawExif"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.imgvault.domain.entity.ImageMetadataEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_metadata (image_id, camera_make, camera_model, lens_model, focal_length,
+                                  aperture, shutter_speed, iso, taken_at, gps_latitude, gps_longitude,
+                                  orientation, raw_exif)
+        VALUES (#{imageId}, #{cameraMake}, #{cameraModel}, #{lensModel}, #{focalLength},
+                #{aperture}, #{shutterSpeed}, #{iso}, #{takenAt}, #{gpsLatitude}, #{gpsLongitude},
+                #{orientation}, #{rawExif})
+    </insert>
+
+    <select id="findByImageId" resultMap="metadataResultMap">
+        SELECT * FROM img_metadata WHERE image_id = #{imageId}
+    </select>
+
+    <delete id="deleteByImageId">
+        DELETE FROM img_metadata WHERE image_id = #{imageId}
+    </delete>
+</mapper>
