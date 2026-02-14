@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.UploadTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.imgvault.domain.entity.UploadTaskEntity">
+        <id column="id" property="id"/>
+        <result column="upload_id" property="uploadId"/>
+        <result column="file_name" property="fileName"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="file_hash" property="fileHash"/>
+        <result column="chunk_size" property="chunkSize"/>
+        <result column="total_chunks" property="totalChunks"/>
+        <result column="uploaded_chunks" property="uploadedChunks"/>
+        <result column="uploaded_parts" property="uploadedParts"/>
+        <result column="storage_path" property="storagePath"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="expires_at" property="expiresAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_upload_task (upload_id, file_name, file_size, file_hash,
+            chunk_size, total_chunks, uploaded_chunks, uploaded_parts,
+            storage_path, status, expires_at)
+        VALUES (#{uploadId}, #{fileName}, #{fileSize}, #{fileHash},
+            #{chunkSize}, #{totalChunks}, #{uploadedChunks}, #{uploadedParts},
+            #{storagePath}, #{status}, #{expiresAt})
+    </insert>
+
+    <select id="findByUploadId" resultMap="BaseResultMap">
+        SELECT * FROM img_upload_task WHERE upload_id = #{uploadId}
+    </select>
+
+    <update id="update">
+        UPDATE img_upload_task
+        SET uploaded_chunks = #{uploadedChunks},
+            uploaded_parts = #{uploadedParts},
+            status = #{status},
+            updated_at = datetime('now')
+        WHERE upload_id = #{uploadId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE img_upload_task
+        SET status = #{status}, updated_at = datetime('now')
+        WHERE upload_id = #{uploadId}
+    </update>
+
+    <select id="findExpiredTasks" resultMap="BaseResultMap">
+        SELECT * FROM img_upload_task
+        WHERE status = 'uploading' AND expires_at &lt; #{expireTime}
+    </select>
+
+    <delete id="deleteByUploadId">
+        DELETE FROM img_upload_task WHERE upload_id = #{uploadId}
+    </delete>
+
+</mapper>

@@ -32,7 +32,7 @@ spring:
   # Caffeine 缓存
   cache:
     type: caffeine
-    cache-names: imageCache,fingerprintCache,tagCache
+    cache-names: imageCache,fingerprintCache,tagCache,albumCache
     caffeine:
       spec: maximumSize=10000,expireAfterWrite=30m,expireAfterAccess=10m,recordStats
 

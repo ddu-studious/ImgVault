@@ -9,10 +9,10 @@
         <result column="camera_model" property="cameraModel"/>
         <result column="lens_model" property="lensModel"/>
         <result column="focal_length" property="focalLength"/>
-        <result column="aperture" property="aperture"/>
-        <result column="shutter_speed" property="shutterSpeed"/>
+        <result column="aperture" property="fNumber"/>
+        <result column="shutter_speed" property="exposureTime"/>
         <result column="iso" property="iso"/>
-        <result column="taken_at" property="takenAt"/>
+        <result column="taken_at" property="dateTaken"/>
         <result column="gps_latitude" property="gpsLatitude"/>
         <result column="gps_longitude" property="gpsLongitude"/>
         <result column="orientation" property="orientation"/>
@@ -25,7 +25,7 @@
                                   aperture, shutter_speed, iso, taken_at, gps_latitude, gps_longitude,
                                   orientation, raw_exif)
         VALUES (#{imageId}, #{cameraMake}, #{cameraModel}, #{lensModel}, #{focalLength},
-                #{aperture}, #{shutterSpeed}, #{iso}, #{takenAt}, #{gpsLatitude}, #{gpsLongitude},
+                #{fNumber}, #{exposureTime}, #{iso}, #{dateTaken}, #{gpsLatitude}, #{gpsLongitude},
                 #{orientation}, #{rawExif})
     </insert>
 

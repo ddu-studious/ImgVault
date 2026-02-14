@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.TagMapper">
+
+    <resultMap id="BaseResultMap" type="com.imgvault.domain.entity.TagEntity">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="image_count" property="imageCount"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_tag (name) VALUES (#{name})
+    </insert>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM img_tag WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultMap="BaseResultMap">
+        SELECT * FROM img_tag WHERE name = #{name}
+    </select>
+
+    <select id="findAll" resultMap="BaseResultMap">
+        SELECT * FROM img_tag ORDER BY image_count DESC
+    </select>
+
+    <select id="findByImageId" resultMap="BaseResultMap">
+        SELECT t.* FROM img_tag t
+        INNER JOIN img_image_tag it ON t.id = it.tag_id
+        WHERE it.image_id = #{imageId}
+    </select>
+
+    <update id="update">
+        UPDATE img_tag SET name = #{name} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM img_tag WHERE id = #{id}
+    </delete>
+
+    <insert id="addImageTag">
+        INSERT OR IGNORE INTO img_image_tag (image_id, tag_id) VALUES (#{imageId}, #{tagId})
+    </insert>
+
+    <delete id="removeImageTag">
+        DELETE FROM img_image_tag WHERE image_id = #{imageId} AND tag_id = #{tagId}
+    </delete>
+
+    <delete id="removeAllImageTags">
+        DELETE FROM img_image_tag WHERE image_id = #{imageId}
+    </delete>
+
+    <select id="findImageIdsByTagId" resultType="java.lang.Long">
+        SELECT image_id FROM img_image_tag
+        WHERE tag_id = #{tagId}
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countImagesByTagId" resultType="int">
+        SELECT COUNT(*) FROM img_image_tag WHERE tag_id = #{tagId}
+    </select>
+
+    <update id="incrementImageCount">
+        UPDATE img_tag SET image_count = image_count + 1 WHERE id = #{tagId}
+    </update>
+
+    <update id="decrementImageCount">
+        UPDATE img_tag SET image_count = CASE WHEN image_count > 0 THEN image_count - 1 ELSE 0 END
+        WHERE id = #{tagId}
+    </update>
+
+</mapper>

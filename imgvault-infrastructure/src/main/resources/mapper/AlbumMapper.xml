@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.AlbumMapper">
+
+    <resultMap id="BaseResultMap" type="com.imgvault.domain.entity.AlbumEntity">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="cover_image_id" property="coverImageId"/>
+        <result column="image_count" property="imageCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_album (name, description, cover_image_id)
+        VALUES (#{name}, #{description}, #{coverImageId})
+    </insert>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM img_album WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="BaseResultMap">
+        SELECT * FROM img_album ORDER BY updated_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM img_album
+    </select>
+
+    <update id="update">
+        UPDATE img_album
+        SET name = #{name}, description = #{description},
+            cover_image_id = #{coverImageId},
+            updated_at = datetime('now')
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM img_album WHERE id = #{id}
+    </delete>
+
+    <insert id="addImage">
+        INSERT OR IGNORE INTO img_album_image (album_id, image_id, sort_order)
+        VALUES (#{albumId}, #{imageId}, #{sortOrder})
+    </insert>
+
+    <delete id="removeImage">
+        DELETE FROM img_album_image WHERE album_id = #{albumId} AND image_id = #{imageId}
+    </delete>
+
+    <delete id="removeAllImages">
+        DELETE FROM img_album_image WHERE album_id = #{albumId}
+    </delete>
+
+    <select id="findImageIdsByAlbumId" resultType="java.lang.Long">
+        SELECT image_id FROM img_album_image
+        WHERE album_id = #{albumId}
+        ORDER BY sort_order ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countImagesByAlbumId" resultType="int">
+        SELECT COUNT(*) FROM img_album_image WHERE album_id = #{albumId}
+    </select>
+
+    <update id="incrementImageCount">
+        UPDATE img_album SET image_count = image_count + 1, updated_at = datetime('now')
+        WHERE id = #{albumId}
+    </update>
+
+    <update id="decrementImageCount">
+        UPDATE img_album SET image_count = CASE WHEN image_count > 0 THEN image_count - 1 ELSE 0 END,
+            updated_at = datetime('now')
+        WHERE id = #{albumId}
+    </update>
+
+</mapper>

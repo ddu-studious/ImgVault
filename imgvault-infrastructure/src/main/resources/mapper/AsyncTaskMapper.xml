@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.imgvault.infrastructure.persistence.mapper.AsyncTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.imgvault.domain.entity.AsyncTaskEntity">
+        <id column="id" property="id"/>
+        <result column="task_type" property="taskType"/>
+        <result column="image_id" property="imageId"/>
+        <result column="params" property="params"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="max_retry" property="maxRetry"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="executed_at" property="executedAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO img_async_task (task_type, image_id, params, status, retry_count, max_retry)
+        VALUES (#{taskType}, #{imageId}, #{params}, #{status}, #{retryCount}, #{maxRetry})
+    </insert>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM img_async_task WHERE id = #{id}
+    </select>
+
+    <select id="findPendingTasks" resultMap="BaseResultMap">
+        SELECT * FROM img_async_task
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findFailedRetryableTasks" resultMap="BaseResultMap">
+        SELECT * FROM img_async_task
+        WHERE status = 'failed' AND retry_count &lt; max_retry
+        ORDER BY updated_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE img_async_task
+        SET status = #{status},
+            error_message = #{errorMessage},
+            updated_at = datetime('now')
+        WHERE id = #{id}
+    </update>
+
+    <update id="incrementRetryCount">
+        UPDATE img_async_task
+        SET retry_count = retry_count + 1,
+            updated_at = datetime('now')
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateExecutedAt">
+        UPDATE img_async_task
+        SET executed_at = #{executedAt},
+            updated_at = datetime('now')
+        WHERE id = #{id}
+    </update>
+
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM img_async_task WHERE status = #{status}
+    </select>
+
+</mapper>

@@ -121,6 +121,69 @@ public class ImageController {
         return Result.success("永久删除成功", null);
     }
 
+    // ==================== Phase 3: 高级上传功能 ====================
+
+    /**
+     * F18: 秒传检测
+     */
+    @PostMapping("/instant-upload")
+    @Operation(summary = "秒传检测", description = "通过文件哈希检测是否已存在，实现秒传")
+    public Result<InstantUploadDTO> instantUpload(@Valid @RequestBody InstantUploadRequest request) {
+        return Result.success(imageAppService.checkInstantUpload(request));
+    }
+
+    /**
+     * F19: 获取预签名上传 URL
+     */
+    @PostMapping("/presigned-upload")
+    @Operation(summary = "获取预签名上传URL", description = "客户端直传 MinIO，返回预签名 PUT URL")
+    public Result<PresignedUploadDTO> getPresignedUploadUrl(
+            @Valid @RequestBody PresignedUploadRequest request) {
+        return Result.success(imageAppService.getPresignedUploadUrl(request));
+    }
+
+    /**
+     * F19: 预签名上传确认
+     */
+    @PostMapping("/presigned-upload/confirm")
+    @Operation(summary = "预签名上传确认", description = "客户端直传完成后，调用此接口创建图片记录")
+    public Result<ImageUploadDTO> confirmPresignedUpload(
+            @Valid @RequestBody PresignedUploadConfirmRequest request) {
+        return Result.success("上传确认成功", imageAppService.confirmPresignedUpload(request));
+    }
+
+    /**
+     * F20: 初始化分片上传
+     */
+    @PostMapping("/chunk-upload/init")
+    @Operation(summary = "初始化分片上传", description = "返回上传任务ID和分片信息")
+    public Result<ChunkUploadInitDTO> initChunkUpload(
+            @Valid @RequestBody ChunkUploadInitRequest request) {
+        return Result.success(imageAppService.initChunkUpload(request));
+    }
+
+    /**
+     * F20 + F21: 上传分片
+     */
+    @PostMapping(value = "/chunk-upload/{uploadId}/{chunkNumber}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "上传分片", description = "上传单个分片，支持断点续传")
+    public Result<ChunkUploadDTO> uploadChunk(
+            @Parameter(description = "上传任务ID") @PathVariable String uploadId,
+            @Parameter(description = "分片编号(从1开始)") @PathVariable int chunkNumber,
+            @Parameter(description = "分片数据") @RequestParam("chunk") MultipartFile chunkFile) {
+        return Result.success(imageAppService.uploadChunk(uploadId, chunkNumber, chunkFile));
+    }
+
+    /**
+     * F21: 查询上传进度
+     */
+    @GetMapping("/chunk-upload/{uploadId}/progress")
+    @Operation(summary = "查询上传进度", description = "返回已上传分片列表，用于断点续传")
+    public Result<ChunkUploadInitDTO> getUploadProgress(
+            @Parameter(description = "上传任务ID") @PathVariable String uploadId) {
+        return Result.success(imageAppService.getUploadProgress(uploadId));
+    }
+
     // ==================== Phase 2: imgproxy 图片处理 ====================
 
     /**

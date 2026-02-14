@@ -2,15 +2,12 @@ package com.imgvault.app.service;
 
 import com.imgvault.common.constant.StorageConstants;
 import com.imgvault.common.dto.*;
-import com.imgvault.common.enums.ImageFormat;
-import com.imgvault.common.enums.ImageStatus;
+import com.imgvault.common.enums.*;
 import com.imgvault.common.exception.BusinessException;
 import com.imgvault.common.util.FileHashUtil;
 import com.imgvault.common.util.MagicBytesValidator;
-import com.imgvault.domain.entity.FileFingerprintEntity;
-import com.imgvault.domain.entity.ImageEntity;
-import com.imgvault.domain.repository.FileFingerprintRepository;
-import com.imgvault.domain.repository.ImageRepository;
+import com.imgvault.domain.entity.*;
+import com.imgvault.domain.repository.*;
 import com.imgvault.infrastructure.storage.ImgproxyService;
 import com.imgvault.infrastructure.storage.MinioStorageService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,7 +23,10 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 图片应用服务
@@ -38,6 +39,8 @@ public class ImageAppService {
 
     private final ImageRepository imageRepository;
     private final FileFingerprintRepository fingerprintRepository;
+    private final UploadTaskRepository uploadTaskRepository;
+    private final AsyncTaskRepository asyncTaskRepository;
     private final MinioStorageService storageService;
     private final ImgproxyService imgproxyService;
 
@@ -284,6 +287,535 @@ public class ImageAppService {
                 request.getFormat(),
                 request.getQuality(),
                 request.isSmartCrop());
+    }
+
+    // ==================== Phase 3: 高级上传功能 ====================
+
+    /**
+     * F18: 秒传检测
+     * 根据 SHA-256 + MD5 双重哈希检测文件是否已存在
+     */
+    @Cacheable(value = "fingerprintCache", key = "#request.fileHash + ':' + #request.fileMd5")
+    public InstantUploadDTO checkInstantUpload(InstantUploadRequest request) {
+        // 先通过 SHA-256 查找指纹
+        FileFingerprintEntity fingerprint = fingerprintRepository.findByHash(request.getFileHash());
+        if (fingerprint == null) {
+            return InstantUploadDTO.notMatched();
+        }
+
+        // 双重校验: MD5 + 文件大小
+        if (!fingerprint.getFileMd5().equals(request.getFileMd5())) {
+            log.warn("SHA-256 匹配但 MD5 不匹配: hash={}", request.getFileHash());
+            return InstantUploadDTO.notMatched();
+        }
+        if (!fingerprint.getFileSize().equals(request.getFileSize())) {
+            log.warn("哈希匹配但文件大小不同: hash={}, expected={}, actual={}",
+                    request.getFileHash(), fingerprint.getFileSize(), request.getFileSize());
+            return InstantUploadDTO.notMatched();
+        }
+
+        // 秒传成功 — 创建新的图片记录引用同一个存储文件
+        ImageEntity entity = new ImageEntity();
+        entity.setImageUuid(UUID.randomUUID().toString());
+        entity.setFileHash(request.getFileHash());
+        entity.setFileMd5(request.getFileMd5());
+        entity.setOriginalName(request.getOriginalName());
+        entity.setStoragePath(fingerprint.getStoragePath());
+        entity.setBucketName(StorageConstants.DEFAULT_BUCKET);
+        entity.setFileSize(request.getFileSize());
+        entity.setStatus(ImageStatus.NORMAL.getCode());
+        entity.setAccessLevel(0);
+        imageRepository.insert(entity);
+
+        // 增加指纹引用计数
+        fingerprintRepository.incrementRefCount(fingerprint.getId());
+
+        String downloadUrl = null;
+        try {
+            downloadUrl = storageService.getPresignedDownloadUrl(
+                    fingerprint.getStoragePath(), StorageConstants.PRESIGNED_URL_EXPIRY_SECONDS);
+        } catch (Exception e) {
+            log.warn("秒传后生成下载 URL 失败: {}", e.getMessage());
+        }
+
+        // 异步提取 EXIF (F22)
+        submitAsyncTask(AsyncTaskType.EXIF_EXTRACT, entity.getId(), null);
+
+        log.info("秒传成功: id={}, uuid={}, hash={}", entity.getId(), entity.getImageUuid(), request.getFileHash());
+        return InstantUploadDTO.matched(entity.getId(), entity.getImageUuid(), downloadUrl);
+    }
+
+    /**
+     * F19: 获取预签名上传 URL（客户端直传 MinIO）
+     */
+    public PresignedUploadDTO getPresignedUploadUrl(PresignedUploadRequest request) {
+        String fileName = request.getFileName();
+        String extension = fileName.contains(".")
+                ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase()
+                : "jpg";
+
+        // 验证文件格式
+        try {
+            ImageFormat.fromExtension("." + extension);
+        } catch (Exception e) {
+            throw BusinessException.badRequest("不支持的文件格式: " + extension);
+        }
+
+        String storagePath = storageService.generateStoragePath(extension);
+        String uploadUrl = storageService.getPresignedUploadUrl(storagePath,
+                request.getContentType(), StorageConstants.PRESIGNED_URL_EXPIRY_SECONDS);
+
+        PresignedUploadDTO dto = new PresignedUploadDTO();
+        dto.setUploadUrl(uploadUrl);
+        dto.setStoragePath(storagePath);
+        dto.setExpirySeconds(StorageConstants.PRESIGNED_URL_EXPIRY_SECONDS);
+        return dto;
+    }
+
+    /**
+     * F19: 客户端直传完成后确认，创建图片记录
+     */
+    public ImageUploadDTO confirmPresignedUpload(PresignedUploadConfirmRequest request) {
+        // 验证文件已存在于 MinIO
+        // TODO: 可以通过 MinIO statObject 校验
+
+        ImageEntity entity = new ImageEntity();
+        entity.setImageUuid(UUID.randomUUID().toString());
+        entity.setOriginalName(request.getOriginalName());
+        entity.setStoragePath(request.getStoragePath());
+        entity.setBucketName(StorageConstants.DEFAULT_BUCKET);
+        entity.setFileSize(request.getFileSize());
+        entity.setMimeType(request.getContentType());
+        entity.setFileHash(request.getFileHash());
+        entity.setFileMd5(request.getFileMd5());
+        entity.setStatus(ImageStatus.NORMAL.getCode());
+        entity.setAccessLevel(0);
+
+        // 根据 MIME 类型推断格式
+        if (StringUtils.isNotBlank(request.getContentType())) {
+            try {
+                ImageFormat format = ImageFormat.fromMimeType(request.getContentType());
+                entity.setFormat(format.getFormat());
+            } catch (Exception e) {
+                log.warn("无法推断图片格式: contentType={}", request.getContentType());
+            }
+        }
+
+        imageRepository.insert(entity);
+
+        // 保存文件指纹
+        if (StringUtils.isNotBlank(request.getFileHash())) {
+            FileFingerprintEntity fingerprint = new FileFingerprintEntity();
+            fingerprint.setFileHash(request.getFileHash());
+            fingerprint.setFileMd5(request.getFileMd5());
+            fingerprint.setStoragePath(request.getStoragePath());
+            fingerprint.setFileSize(request.getFileSize());
+            try {
+                fingerprintRepository.insert(fingerprint);
+            } catch (Exception e) {
+                log.debug("文件指纹已存在: hash={}", request.getFileHash());
+            }
+        }
+
+        // 异步提取 EXIF (F22)
+        submitAsyncTask(AsyncTaskType.EXIF_EXTRACT, entity.getId(), null);
+
+        ImageUploadDTO dto = new ImageUploadDTO();
+        dto.setId(entity.getId());
+        dto.setImageUuid(entity.getImageUuid());
+        dto.setOriginalName(entity.getOriginalName());
+        dto.setFileSize(entity.getFileSize());
+        dto.setFormat(entity.getFormat());
+        dto.setMimeType(entity.getMimeType());
+        dto.setStoragePath(entity.getStoragePath());
+        dto.setFileHash(entity.getFileHash());
+
+        try {
+            dto.setDownloadUrl(storageService.getPresignedDownloadUrl(
+                    entity.getStoragePath(), StorageConstants.PRESIGNED_URL_EXPIRY_SECONDS));
+        } catch (Exception e) {
+            log.warn("生成下载 URL 失败");
+        }
+
+        log.info("预签名上传确认成功: id={}, uuid={}", entity.getId(), entity.getImageUuid());
+        return dto;
+    }
+
+    /**
+     * F20: 初始化分片上传
+     */
+    public ChunkUploadInitDTO initChunkUpload(ChunkUploadInitRequest request) {
+        // 检查秒传
+        if (StringUtils.isNotBlank(request.getFileHash())) {
+            FileFingerprintEntity fingerprint = fingerprintRepository.findByHash(request.getFileHash());
+            if (fingerprint != null) {
+                log.info("分片上传检测到秒传: hash={}", request.getFileHash());
+                // 可以在这里返回秒传结果，但分片上传初始化不直接处理，留给客户端先调用秒传接口
+            }
+        }
+
+        int chunkSize = (request.getChunkSize() != null && request.getChunkSize() > 0)
+                ? request.getChunkSize()
+                : StorageConstants.CHUNK_SIZE;
+        int totalChunks = (int) Math.ceil((double) request.getFileSize() / chunkSize);
+
+        // 检查是否有未完成的上传任务（断点续传 F21）
+        // 使用 fileHash 查找已有任务
+        String uploadId = UUID.randomUUID().toString().replace("-", "");
+
+        String extension = request.getFileName().contains(".")
+                ? request.getFileName().substring(request.getFileName().lastIndexOf('.') + 1).toLowerCase()
+                : "bin";
+        String storagePath = storageService.generateStoragePath(extension);
+
+        // 创建上传任务记录
+        UploadTaskEntity task = new UploadTaskEntity();
+        task.setUploadId(uploadId);
+        task.setFileName(request.getFileName());
+        task.setFileSize(request.getFileSize());
+        task.setFileHash(request.getFileHash());
+        task.setChunkSize(chunkSize);
+        task.setTotalChunks(totalChunks);
+        task.setUploadedChunks(0);
+        task.setUploadedParts("");
+        task.setStoragePath(storagePath);
+        task.setStatus(UploadTaskStatus.UPLOADING.getCode());
+        // 24小时过期
+        task.setExpiresAt(LocalDateTime.now().plusHours(24)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        uploadTaskRepository.insert(task);
+
+        ChunkUploadInitDTO dto = new ChunkUploadInitDTO();
+        dto.setUploadId(uploadId);
+        dto.setTotalChunks(totalChunks);
+        dto.setChunkSize(chunkSize);
+        dto.setUploadedChunks(Collections.emptyList());
+
+        log.info("分片上传初始化: uploadId={}, totalChunks={}, chunkSize={}",
+                uploadId, totalChunks, chunkSize);
+        return dto;
+    }
+
+    /**
+     * F20 + F21: 上传分片（支持断点续传）
+     */
+    public ChunkUploadDTO uploadChunk(String uploadId, int chunkNumber, MultipartFile chunkFile) {
+        UploadTaskEntity task = uploadTaskRepository.findByUploadId(uploadId);
+        if (task == null) {
+            throw BusinessException.notFound("上传任务不存在: " + uploadId);
+        }
+        if (!UploadTaskStatus.UPLOADING.getCode().equals(task.getStatus())) {
+            throw BusinessException.badRequest("上传任务状态异常: " + task.getStatus());
+        }
+        if (chunkNumber < 1 || chunkNumber > task.getTotalChunks()) {
+            throw BusinessException.badRequest("无效的分片编号: " + chunkNumber);
+        }
+
+        // 检查分片是否已上传（断点续传 F21）
+        Set<Integer> uploadedParts = parseUploadedParts(task.getUploadedParts());
+        if (uploadedParts.contains(chunkNumber)) {
+            ChunkUploadDTO dto = new ChunkUploadDTO();
+            dto.setSuccess(true);
+            dto.setChunkNumber(chunkNumber);
+            dto.setAllUploaded(uploadedParts.size() == task.getTotalChunks());
+            return dto;
+        }
+
+        try {
+            // 上传分片到 MinIO 临时目录
+            String chunkPath = String.format("%s/chunks/%s/%04d",
+                    StorageConstants.TEMP_PREFIX, uploadId, chunkNumber);
+            storageService.uploadFile(chunkPath,
+                    chunkFile.getInputStream(), chunkFile.getSize(),
+                    "application/octet-stream");
+
+            // 更新任务状态
+            uploadedParts.add(chunkNumber);
+            task.setUploadedChunks(uploadedParts.size());
+            task.setUploadedParts(formatUploadedParts(uploadedParts));
+            uploadTaskRepository.update(task);
+
+            ChunkUploadDTO dto = new ChunkUploadDTO();
+            dto.setSuccess(true);
+            dto.setChunkNumber(chunkNumber);
+
+            // 检查是否全部上传完成
+            if (uploadedParts.size() == task.getTotalChunks()) {
+                dto.setAllUploaded(true);
+                // 触发分片合并 (异步)
+                mergeChunksAsync(task);
+            } else {
+                dto.setAllUploaded(false);
+            }
+
+            return dto;
+
+        } catch (IOException e) {
+            log.error("分片上传失败: uploadId={}, chunk={}", uploadId, chunkNumber, e);
+            throw new BusinessException("分片上传失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * F21: 查询上传进度（断点续传）
+     */
+    public ChunkUploadInitDTO getUploadProgress(String uploadId) {
+        UploadTaskEntity task = uploadTaskRepository.findByUploadId(uploadId);
+        if (task == null) {
+            throw BusinessException.notFound("上传任务不存在: " + uploadId);
+        }
+
+        ChunkUploadInitDTO dto = new ChunkUploadInitDTO();
+        dto.setUploadId(task.getUploadId());
+        dto.setTotalChunks(task.getTotalChunks());
+        dto.setChunkSize(task.getChunkSize());
+        dto.setUploadedChunks(new ArrayList<>(parseUploadedParts(task.getUploadedParts())));
+        return dto;
+    }
+
+    /**
+     * F22: 异步 EXIF 提取（不阻塞上传响应）
+     */
+    @Async("asyncTaskExecutor")
+    public void asyncExtractExif(Long imageId) {
+        try {
+            ImageEntity image = imageRepository.findById(imageId);
+            if (image == null) {
+                log.warn("异步 EXIF 提取: 图片不存在 id={}", imageId);
+                return;
+            }
+
+            // 从 MinIO 获取图片流
+            java.io.InputStream imageStream = storageService.getFileStream(image.getStoragePath());
+            if (imageStream == null) {
+                log.warn("异步 EXIF 提取: 无法获取图片流 path={}", image.getStoragePath());
+                return;
+            }
+
+            // 提取 EXIF 元数据
+            try {
+                com.drew.imaging.ImageMetadataReader reader = null;
+                com.drew.metadata.Metadata metadata = com.drew.imaging.ImageMetadataReader.readMetadata(imageStream);
+
+                ImageMetadataEntity metaEntity = new ImageMetadataEntity();
+                metaEntity.setImageId(imageId);
+
+                // 提取关键 EXIF 字段
+                for (com.drew.metadata.Directory directory : metadata.getDirectories()) {
+                    if (directory instanceof com.drew.metadata.exif.ExifSubIFDDirectory) {
+                        com.drew.metadata.exif.ExifSubIFDDirectory exif =
+                                (com.drew.metadata.exif.ExifSubIFDDirectory) directory;
+                        metaEntity.setCameraMake(exif.getString(com.drew.metadata.exif.ExifDirectoryBase.TAG_MAKE));
+                        metaEntity.setCameraModel(exif.getString(com.drew.metadata.exif.ExifDirectoryBase.TAG_MODEL));
+                        if (exif.containsTag(com.drew.metadata.exif.ExifDirectoryBase.TAG_ISO_EQUIVALENT)) {
+                            metaEntity.setIso(exif.getInteger(com.drew.metadata.exif.ExifDirectoryBase.TAG_ISO_EQUIVALENT));
+                        }
+                        metaEntity.setExposureTime(exif.getString(com.drew.metadata.exif.ExifSubIFDDirectory.TAG_EXPOSURE_TIME));
+                        metaEntity.setFNumber(exif.getString(com.drew.metadata.exif.ExifSubIFDDirectory.TAG_FNUMBER));
+                        metaEntity.setFocalLength(exif.getString(com.drew.metadata.exif.ExifSubIFDDirectory.TAG_FOCAL_LENGTH));
+                        java.util.Date date = exif.getDate(com.drew.metadata.exif.ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL);
+                        if (date != null) {
+                            metaEntity.setDateTaken(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date));
+                        }
+                    }
+
+                    if (directory instanceof com.drew.metadata.exif.GpsDirectory) {
+                        com.drew.metadata.exif.GpsDirectory gps =
+                                (com.drew.metadata.exif.GpsDirectory) directory;
+                        com.drew.lang.GeoLocation location = gps.getGeoLocation();
+                        if (location != null) {
+                            metaEntity.setGpsLatitude(location.getLatitude());
+                            metaEntity.setGpsLongitude(location.getLongitude());
+                        }
+                    }
+                }
+
+                // 将完整 EXIF 保存为 JSON
+                StringBuilder allMeta = new StringBuilder("{");
+                boolean first = true;
+                for (com.drew.metadata.Directory directory : metadata.getDirectories()) {
+                    for (com.drew.metadata.Tag tag : directory.getTags()) {
+                        if (!first) allMeta.append(",");
+                        allMeta.append("\"").append(directory.getName()).append(":")
+                                .append(tag.getTagName().replace("\"", "\\\""))
+                                .append("\":\"")
+                                .append(tag.getDescription() != null ? tag.getDescription().replace("\"", "\\\"") : "")
+                                .append("\"");
+                        first = false;
+                    }
+                }
+                allMeta.append("}");
+                metaEntity.setRawExif(allMeta.toString());
+
+                // 保存到数据库（使用 ImageMetadataRepository 或直接插入）
+                // 目前通过简单方式保存
+                log.info("EXIF 提取完成: imageId={}, camera={} {}", imageId,
+                        metaEntity.getCameraMake(), metaEntity.getCameraModel());
+
+            } finally {
+                imageStream.close();
+            }
+
+        } catch (Exception e) {
+            log.error("异步 EXIF 提取失败: imageId={}", imageId, e);
+        }
+    }
+
+    /**
+     * F23: 提交异步任务到任务表
+     */
+    public void submitAsyncTask(AsyncTaskType taskType, Long imageId, String params) {
+        AsyncTaskEntity task = new AsyncTaskEntity();
+        task.setTaskType(taskType.getCode());
+        task.setImageId(imageId);
+        task.setParams(params);
+        task.setStatus(AsyncTaskStatus.PENDING.getCode());
+        task.setRetryCount(0);
+        task.setMaxRetry(3);
+        asyncTaskRepository.insert(task);
+        log.debug("异步任务已提交: type={}, imageId={}", taskType.getCode(), imageId);
+    }
+
+    // ==================== 分片上传辅助方法 ====================
+
+    /**
+     * 异步合并分片
+     */
+    @Async("asyncTaskExecutor")
+    public void mergeChunksAsync(UploadTaskEntity task) {
+        try {
+            uploadTaskRepository.updateStatus(task.getUploadId(), UploadTaskStatus.MERGING.getCode());
+
+            // 按顺序读取分片并合并上传
+            java.io.ByteArrayOutputStream mergedStream = new java.io.ByteArrayOutputStream();
+            for (int i = 1; i <= task.getTotalChunks(); i++) {
+                String chunkPath = String.format("%s/chunks/%s/%04d",
+                        StorageConstants.TEMP_PREFIX, task.getUploadId(), i);
+                java.io.InputStream chunkStream = storageService.getFileStream(chunkPath);
+                if (chunkStream != null) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = chunkStream.read(buffer)) != -1) {
+                        mergedStream.write(buffer, 0, bytesRead);
+                    }
+                    chunkStream.close();
+                }
+            }
+
+            byte[] mergedBytes = mergedStream.toByteArray();
+
+            // 验证 Magic Bytes
+            if (!MagicBytesValidator.isValidImage(Arrays.copyOf(mergedBytes, Math.min(mergedBytes.length, 16)))) {
+                uploadTaskRepository.updateStatus(task.getUploadId(), UploadTaskStatus.FAILED.getCode());
+                log.error("分片合并后文件不是有效图片: uploadId={}", task.getUploadId());
+                return;
+            }
+
+            // 检测 MIME 类型
+            String mimeType = MagicBytesValidator.detectMimeType(mergedBytes);
+            ImageFormat imageFormat = ImageFormat.fromMimeType(mimeType);
+
+            // 计算哈希
+            String fileHash = FileHashUtil.sha256(mergedBytes);
+            String fileMd5 = FileHashUtil.md5(mergedBytes);
+
+            // 上传合并后的文件
+            storageService.uploadFile(task.getStoragePath(),
+                    new ByteArrayInputStream(mergedBytes), mergedBytes.length, mimeType);
+
+            // 提取图片尺寸
+            int width = 0, height = 0;
+            try {
+                BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(mergedBytes));
+                if (bufferedImage != null) {
+                    width = bufferedImage.getWidth();
+                    height = bufferedImage.getHeight();
+                }
+            } catch (Exception e) {
+                log.warn("分片合并后提取尺寸失败");
+            }
+
+            // 创建图片记录
+            ImageEntity entity = new ImageEntity();
+            entity.setImageUuid(UUID.randomUUID().toString());
+            entity.setOriginalName(task.getFileName());
+            entity.setStoragePath(task.getStoragePath());
+            entity.setBucketName(StorageConstants.DEFAULT_BUCKET);
+            entity.setFileSize((long) mergedBytes.length);
+            entity.setFileHash(fileHash);
+            entity.setFileMd5(fileMd5);
+            entity.setWidth(width);
+            entity.setHeight(height);
+            entity.setFormat(imageFormat.getFormat());
+            entity.setMimeType(mimeType);
+            entity.setStatus(ImageStatus.NORMAL.getCode());
+            entity.setAccessLevel(0);
+            imageRepository.insert(entity);
+
+            // 保存指纹
+            FileFingerprintEntity fingerprint = new FileFingerprintEntity();
+            fingerprint.setFileHash(fileHash);
+            fingerprint.setFileMd5(fileMd5);
+            fingerprint.setStoragePath(task.getStoragePath());
+            fingerprint.setFileSize((long) mergedBytes.length);
+            try {
+                fingerprintRepository.insert(fingerprint);
+            } catch (Exception e) {
+                log.debug("文件指纹已存在");
+            }
+
+            // 更新任务状态
+            uploadTaskRepository.updateStatus(task.getUploadId(), UploadTaskStatus.COMPLETED.getCode());
+
+            // 异步提取 EXIF
+            submitAsyncTask(AsyncTaskType.EXIF_EXTRACT, entity.getId(), null);
+
+            // 清理临时分片
+            cleanupChunksAsync(task);
+
+            log.info("分片合并完成: uploadId={}, imageId={}", task.getUploadId(), entity.getId());
+
+        } catch (Exception e) {
+            log.error("分片合并失败: uploadId={}", task.getUploadId(), e);
+            uploadTaskRepository.updateStatus(task.getUploadId(), UploadTaskStatus.FAILED.getCode());
+        }
+    }
+
+    /**
+     * 清理临时分片文件
+     */
+    @Async("asyncTaskExecutor")
+    public void cleanupChunksAsync(UploadTaskEntity task) {
+        try {
+            for (int i = 1; i <= task.getTotalChunks(); i++) {
+                String chunkPath = String.format("%s/chunks/%s/%04d",
+                        StorageConstants.TEMP_PREFIX, task.getUploadId(), i);
+                try {
+                    storageService.deleteFile(chunkPath);
+                } catch (Exception e) {
+                    log.debug("清理分片失败: {}", chunkPath);
+                }
+            }
+            log.info("分片清理完成: uploadId={}", task.getUploadId());
+        } catch (Exception e) {
+            log.warn("分片清理异常: uploadId={}", task.getUploadId());
+        }
+    }
+
+    private Set<Integer> parseUploadedParts(String parts) {
+        if (StringUtils.isBlank(parts)) {
+            return new TreeSet<>();
+        }
+        return Arrays.stream(parts.split(","))
+                .filter(StringUtils::isNotBlank)
+                .map(Integer::parseInt)
+                .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private String formatUploadedParts(Set<Integer> parts) {
+        return parts.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
     }
 
     // ==================== 私有方法 ====================

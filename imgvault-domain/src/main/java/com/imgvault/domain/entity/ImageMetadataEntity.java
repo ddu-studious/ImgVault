@@ -18,10 +18,10 @@ public class ImageMetadataEntity implements Serializable {
     private String cameraModel;
     private String lensModel;
     private String focalLength;
-    private String aperture;
-    private String shutterSpeed;
+    private String fNumber;
+    private String exposureTime;
     private Integer iso;
-    private String takenAt;
+    private String dateTaken;
     private Double gpsLatitude;
     private Double gpsLongitude;
     private Integer orientation;

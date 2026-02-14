@@ -136,14 +136,33 @@ public class MinioStorageService {
      * @return 预签名 URL
      */
     public String getPresignedUploadUrl(String storagePath, int expirySeconds) {
+        return getPresignedUploadUrl(storagePath, null, expirySeconds);
+    }
+
+    /**
+     * 生成预签名上传 URL（客户端直传，含 contentType）
+     *
+     * @param storagePath 存储路径
+     * @param contentType 内容类型
+     * @param expirySeconds 有效期（秒）
+     * @return 预签名 URL
+     */
+    public String getPresignedUploadUrl(String storagePath, String contentType, int expirySeconds) {
         ensureAvailable();
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            GetPresignedObjectUrlArgs.Builder builder = GetPresignedObjectUrlArgs.builder()
                     .method(Method.PUT)
                     .bucket(minioConfig.getBucketName())
                     .object(storagePath)
-                    .expiry(expirySeconds, TimeUnit.SECONDS)
-                    .build());
+                    .expiry(expirySeconds, TimeUnit.SECONDS);
+
+            if (contentType != null && !contentType.isEmpty()) {
+                java.util.Map<String, String> reqParams = new java.util.HashMap<>();
+                reqParams.put("Content-Type", contentType);
+                builder.extraQueryParams(reqParams);
+            }
+
+            return minioClient.getPresignedObjectUrl(builder.build());
         } catch (Exception e) {
             log.error("生成预签名上传 URL 失败: path={}", storagePath, e);
             throw new RuntimeException("生成预签名上传 URL 失败: " + e.getMessage(), e);
