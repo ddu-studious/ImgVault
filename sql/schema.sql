@@ -162,8 +162,9 @@ CREATE TABLE IF NOT EXISTS img_upload_task (
     chunk_size INTEGER NOT NULL,
     total_chunks INTEGER NOT NULL,
     uploaded_chunks INTEGER DEFAULT 0,
-    chunk_status TEXT,                -- JSON: 记录每个分片的状态
-    status INTEGER DEFAULT 0,         -- 0-上传中 1-合并中 2-已完成 3-失败 4-过期
+    uploaded_parts TEXT,               -- 逗号分隔的已上传分片编号
+    storage_path TEXT,                 -- 合并后的存储路径
+    status TEXT DEFAULT 'uploading',   -- uploading/merging/completed/failed/expired
     uploader_id INTEGER,
     expires_at TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
@@ -179,12 +180,12 @@ CREATE INDEX IF NOT EXISTS idx_upload_task_expires ON img_upload_task(expires_at
 -- ==========================================
 CREATE TABLE IF NOT EXISTS img_async_task (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_type TEXT NOT NULL,           -- thumbnail/convert/watermark/exif
+    task_type TEXT NOT NULL,           -- exif_extract/thumbnail_generate/format_convert/image_hash
     image_id INTEGER NOT NULL,
-    payload TEXT,                      -- JSON 任务参数
-    status INTEGER DEFAULT 0,          -- 0-待处理 1-处理中 2-完成 3-失败
+    params TEXT,                       -- JSON 任务参数
+    status TEXT DEFAULT 'pending',     -- pending/processing/success/failed/cancelled
     retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
+    max_retry INTEGER DEFAULT 3,
     error_message TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
@@ -205,7 +206,7 @@ CREATE TABLE IF NOT EXISTS img_operation_log (
     target_type TEXT NOT NULL,          -- image/album/tag
     target_id INTEGER,
     detail TEXT,                        -- JSON 操作详情
-    ip_address TEXT,
+    operator_ip TEXT,                   -- 操作者 IP 地址
     created_at TEXT DEFAULT (datetime('now'))
 );
 

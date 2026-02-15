@@ -5,7 +5,7 @@
     <resultMap id="BaseResultMap" type="com.imgvault.domain.entity.TagEntity">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
-        <result column="image_count" property="imageCount"/>
+        <result column="usage_count" property="imageCount"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
@@ -22,7 +22,7 @@
     </select>
 
     <select id="findAll" resultMap="BaseResultMap">
-        SELECT * FROM img_tag ORDER BY image_count DESC
+        SELECT * FROM img_tag ORDER BY usage_count DESC
     </select>
 
     <select id="findByImageId" resultMap="BaseResultMap">
@@ -63,11 +63,11 @@
     </select>
 
     <update id="incrementImageCount">
-        UPDATE img_tag SET image_count = image_count + 1 WHERE id = #{tagId}
+        UPDATE img_tag SET usage_count = usage_count + 1 WHERE id = #{tagId}
     </update>
 
     <update id="decrementImageCount">
-        UPDATE img_tag SET image_count = CASE WHEN image_count > 0 THEN image_count - 1 ELSE 0 END
+        UPDATE img_tag SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END
         WHERE id = #{tagId}
     </update>
 

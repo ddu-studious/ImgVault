@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgVault - 图片管理</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <a class="logo" href="javascript:navigateTo('images')">
+            <div class="logo-icon">V</div>
+            ImgVault
+        </a>
+        <input class="search-box" id="searchBox" type="text" placeholder="搜索图片...">
+        <div class="header-actions">
+            <button class="btn btn-outline btn-sm" onclick="batchDelete()" title="批量删除选中">🗑 批量删除</button>
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">+ 上传图片</button>
+        </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">浏览</div>
+                <div class="sidebar-item active" id="nav-images" onclick="navigateTo('images')">
+                    <span class="sidebar-icon">🖼</span> 全部图片
+                    <span class="sidebar-count" id="imageCount">0</span>
+                </div>
+                <div class="sidebar-item" id="nav-trash" onclick="navigateTo('trash')">
+                    <span class="sidebar-icon">🗑</span> 回收站
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title" style="display:flex;justify-content:space-between;align-items:center">
+                    相册
+                    <button class="btn btn-sm btn-outline" onclick="showCreateAlbum()" style="font-size:11px;padding:2px 8px">+</button>
+                </div>
+                <div id="albumList"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title" style="display:flex;justify-content:space-between;align-items:center">
+                    标签
+                    <button class="btn btn-sm btn-outline" onclick="showCreateTag()" style="font-size:11px;padding:2px 8px">+</button>
+                </div>
+                <div id="tagList"></div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Upload Zone -->
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-zone-icon">📤</div>
+                <div class="upload-zone-title">拖放图片到此处上传</div>
+                <div class="upload-zone-hint">支持 JPEG / PNG / GIF / WebP / BMP · 最大 50MB</div>
+                <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+            </div>
+
+            <!-- Upload Progress -->
+            <div class="upload-progress" id="uploadProgress"></div>
+
+            <!-- Content Header -->
+            <div class="content-header">
+                <div>
+                    <div class="content-title" id="contentTitle">全部图片</div>
+                    <div class="content-subtitle" id="contentSubtitle">加载中...</div>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            <div class="grid" id="grid">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeModal('detailModal')">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">图片详情</div>
+                <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="detailContent"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

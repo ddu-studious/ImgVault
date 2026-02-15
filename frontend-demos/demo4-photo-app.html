@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgVault - Demo 4: 照片应用</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f0f2f5;
+            --surface: #fff;
+            --text: #1a1a2e;
+            --text-muted: #8b8fa3;
+            --accent: #5b5ea6;
+            --accent-light: #f0f0ff;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --border: #e4e6ef;
+            --radius: 14px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+        /* Left Sidebar */
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 72px; background: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 8px; flex-shrink: 0; }
+        .sidebar-logo { width: 44px; height: 44px; background: var(--accent); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; font-weight: 700; margin-bottom: 20px; }
+        .sidebar-btn { width: 44px; height: 44px; border-radius: 12px; background: transparent; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 18px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .sidebar-btn:hover, .sidebar-btn.active { background: rgba(255,255,255,0.12); color: #fff; }
+
+        /* Main */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .main-header { background: var(--surface); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .page-title { font-size: 20px; font-weight: 700; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+        .search-input { background: var(--bg); border: 1px solid var(--border); padding: 10px 16px; border-radius: 10px; width: 240px; font-size: 13px; outline: none; }
+        .btn-primary { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Stats Cards */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 32px 0; }
+        .stat-card { background: var(--surface); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); }
+        .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 28px; font-weight: 700; margin-top: 8px; }
+        .stat-change { font-size: 12px; color: var(--success); margin-top: 4px; }
+
+        /* Content */
+        .content { padding: 24px 32px; flex: 1; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .section-title { font-size: 16px; font-weight: 600; }
+        .view-all { color: var(--accent); text-decoration: none; font-size: 13px; cursor: pointer; }
+
+        /* Photo Grid - 相册风格 */
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+        .photo-card { background: var(--surface); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); transition: all 0.25s; cursor: pointer; }
+        .photo-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .photo-preview { height: 180px; position: relative; overflow: hidden; }
+        .photo-preview .badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 11px; }
+        .photo-info { padding: 12px 14px; }
+        .photo-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .photo-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+        .photo-tags { display: flex; gap: 4px; margin-top: 8px; }
+        .ptag { background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+
+        /* Upload Dropzone */
+        .dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; background: var(--surface); margin-bottom: 24px; transition: all 0.3s; cursor: pointer; }
+        .dropzone:hover { border-color: var(--accent); background: var(--accent-light); }
+        .dropzone-icon { font-size: 40px; margin-bottom: 8px; }
+        .dropzone-text { font-size: 14px; font-weight: 500; }
+        .dropzone-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .stats { grid-template-columns: repeat(2, 1fr); padding: 16px; }
+            .content { padding: 16px; }
+            .photo-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <div class="sidebar-logo">V</div>
+            <button class="sidebar-btn active" title="图库">🖼</button>
+            <button class="sidebar-btn" title="相册">📁</button>
+            <button class="sidebar-btn" title="标签">🏷</button>
+            <button class="sidebar-btn" title="统计">📊</button>
+            <div style="flex:1"></div>
+            <button class="sidebar-btn" title="设置">⚙</button>
+        </div>
+
+        <div class="main">
+            <div class="main-header">
+                <div class="page-title">图片库</div>
+                <div class="header-actions">
+                    <input class="search-input" placeholder="搜索图片、标签...">
+                    <button class="btn-primary">+ 上传图片</button>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">总图片</div>
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-change">+23 本周</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">总存储</div>
+                    <div class="stat-value">4.8 GB</div>
+                    <div class="stat-change">+320 MB 本周</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">相册数</div>
+                    <div class="stat-value">12</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">标签数</div>
+                    <div class="stat-value">38</div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="dropzone">
+                    <div class="dropzone-icon">📤</div>
+                    <div class="dropzone-text">拖放图片到这里上传</div>
+                    <div class="dropzone-hint">支持 JPEG / PNG / GIF / WebP / BMP · 最大 50MB</div>
+                </div>
+
+                <div class="section-header">
+                    <div class="section-title">最近上传</div>
+                    <a class="view-all">查看全部 →</a>
+                </div>
+
+                <div class="photo-grid" id="photoGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 风格说明：Dashboard 风格照片应用，统计卡片 + 照片网格，紫蓝色调
+        const mockPhotos = [
+            { name: 'sunset-beach.jpg', dim: '1920x1080', size: '2.1 MB', format: 'JPEG', tags: ['风景', '海边'], color: '#e74c3c' },
+            { name: 'mountain-view.png', dim: '4000x3000', size: '3.5 MB', format: 'PNG', tags: ['风景'], color: '#2ecc71' },
+            { name: 'tokyo-tower.jpg', dim: '1600x900', size: '1.8 MB', format: 'JPEG', tags: ['城市', '旅行'], color: '#3498db' },
+            { name: 'sakura.webp', dim: '800x1200', size: '0.9 MB', format: 'WebP', tags: ['花卉'], color: '#e91e63' },
+            { name: 'deep-ocean.jpg', dim: '3840x2160', size: '4.2 MB', format: 'JPEG', tags: ['风景'], color: '#00bcd4' },
+            { name: 'bamboo-forest.png', dim: '2560x1440', size: '2.7 MB', format: 'PNG', tags: ['自然'], color: '#4caf50' },
+            { name: 'milky-way.jpg', dim: '5120x2880', size: '5.1 MB', format: 'JPEG', tags: ['星空'], color: '#1a237e' },
+            { name: 'cute-cat.gif', dim: '600x400', size: '1.2 MB', format: 'GIF', tags: ['动物'], color: '#ff9800' },
+        ];
+
+        const grid = document.getElementById('photoGrid');
+        mockPhotos.forEach(p => {
+            grid.innerHTML += `
+                <div class="photo-card">
+                    <div class="photo-preview" style="background:${p.color}">
+                        <div class="badge">${p.format}</div>
+                    </div>
+                    <div class="photo-info">
+                        <div class="photo-name">${p.name}</div>
+                        <div class="photo-meta"><span>${p.dim}</span><span>${p.size}</span></div>
+                        <div class="photo-tags">${p.tags.map(t => `<span class="ptag">${t}</span>`).join('')}</div>
+                    </div>
+                </div>`;
+        });
+    </script>
+</body>
+</html>

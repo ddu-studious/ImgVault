@@ -38,13 +38,13 @@ public class ImageRepositoryImpl implements ImageRepository {
     }
 
     @Override
-    public List<ImageEntity> findPage(String format, Integer status, String sortBy, String sortOrder, int offset, int limit) {
-        return imageMapper.findPage(format, status, sortBy, sortOrder, offset, limit);
+    public List<ImageEntity> findPage(String format, Integer status, String keyword, String sortBy, String sortOrder, int offset, int limit) {
+        return imageMapper.findPage(format, status, keyword, sortBy, sortOrder, offset, limit);
     }
 
     @Override
-    public long count(String format, Integer status) {
-        return imageMapper.count(format, status);
+    public long count(String format, Integer status, String keyword) {
+        return imageMapper.count(format, status, keyword);
     }
 
     @Override
@@ -70,5 +70,26 @@ public class ImageRepositoryImpl implements ImageRepository {
     @Override
     public int incrementViewCount(Long id) {
         return imageMapper.incrementViewCount(id);
+    }
+
+    // ===== Admin 统计 =====
+    @Override
+    public long countByStatus(Integer status) {
+        return imageMapper.countByStatus(status);
+    }
+
+    @Override
+    public long sumFileSize() {
+        return imageMapper.sumFileSize();
+    }
+
+    @Override
+    public java.util.List<java.util.Map<String, Object>> countByFormat() {
+        return imageMapper.countByFormat();
+    }
+
+    @Override
+    public long countTodayUploads() {
+        return imageMapper.countTodayUploads();
     }
 }

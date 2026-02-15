@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 public class ImageAppService {
 
     private final ImageRepository imageRepository;
+    private final ImageMetadataRepository imageMetadataRepository;
     private final FileFingerprintRepository fingerprintRepository;
     private final UploadTaskRepository uploadTaskRepository;
     private final AsyncTaskRepository asyncTaskRepository;
@@ -190,18 +191,21 @@ public class ImageAppService {
 
     /**
      * F05: 分页查询图片列表
+     * 支持按状态、格式、关键词过滤
      */
     public PageResult<ImageDetailDTO> listImages(ImageQueryRequest request) {
-        Integer status = ImageStatus.NORMAL.getCode();
+        // 状态：默认只查正常(1)，admin可传指定状态或null查全部
+        Integer status = request.getStatus() != null ? request.getStatus() : ImageStatus.NORMAL.getCode();
         String format = StringUtils.isNotBlank(request.getFormat()) ? request.getFormat() : null;
+        String keyword = StringUtils.isNotBlank(request.getKeyword()) ? request.getKeyword() : null;
 
-        long total = imageRepository.count(format, status);
+        long total = imageRepository.count(format, status, keyword);
         if (total == 0) {
             return PageResult.empty(request.getPage(), request.getSize());
         }
 
         List<ImageEntity> entities = imageRepository.findPage(
-                format, status,
+                format, status, keyword,
                 request.getSortBy(), request.getSortOrder(),
                 request.getOffset(), request.getSize());
 
@@ -238,6 +242,44 @@ public class ImageAppService {
         }
         imageRepository.softDelete(id);
         log.info("图片已软删除: id={}", id);
+    }
+
+    /**
+     * F30: 从回收站恢复图片
+     */
+    @CacheEvict(value = "imageCache", allEntries = true)
+    public void restoreImage(Long id) {
+        ImageEntity entity = imageRepository.findById(id);
+        if (entity == null) {
+            throw BusinessException.notFound("图片不存在: " + id);
+        }
+        if (entity.getStatus() != ImageStatus.DELETED.getCode()) {
+            throw BusinessException.badRequest("该图片未被删除，无需恢复");
+        }
+        imageRepository.updateStatus(id, ImageStatus.NORMAL.getCode());
+        log.info("图片已恢复: id={}", id);
+    }
+
+    /**
+     * Admin: 获取系统统计信息
+     */
+    public java.util.Map<String, Object> getAdminStats() {
+        java.util.Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        stats.put("totalImages", imageRepository.countByStatus(ImageStatus.NORMAL.getCode()));
+        stats.put("deletedImages", imageRepository.countByStatus(ImageStatus.DELETED.getCode()));
+        stats.put("reviewingImages", imageRepository.countByStatus(ImageStatus.REVIEWING.getCode()));
+        stats.put("totalStorage", imageRepository.sumFileSize());
+        stats.put("todayUploads", imageRepository.countTodayUploads());
+
+        // 格式分布
+        java.util.Map<String, Long> formatDist = new java.util.LinkedHashMap<>();
+        for (java.util.Map<String, Object> row : imageRepository.countByFormat()) {
+            String format = String.valueOf(row.get("format"));
+            long cnt = ((Number) row.get("cnt")).longValue();
+            formatDist.put(format, cnt);
+        }
+        stats.put("formatDistribution", formatDist);
+        return stats;
     }
 
     /**
@@ -647,10 +689,14 @@ public class ImageAppService {
                 allMeta.append("}");
                 metaEntity.setRawExif(allMeta.toString());
 
-                // 保存到数据库（使用 ImageMetadataRepository 或直接插入）
-                // 目前通过简单方式保存
-                log.info("EXIF 提取完成: imageId={}, camera={} {}", imageId,
-                        metaEntity.getCameraMake(), metaEntity.getCameraModel());
+                // 保存到数据库
+                try {
+                    imageMetadataRepository.insert(metaEntity);
+                    log.info("EXIF 提取并保存成功: imageId={}, camera={} {}", imageId,
+                            metaEntity.getCameraMake(), metaEntity.getCameraModel());
+                } catch (Exception ex) {
+                    log.warn("EXIF 保存失败（可能已存在）: imageId={}, error={}", imageId, ex.getMessage());
+                }
 
             } finally {
                 imageStream.close();

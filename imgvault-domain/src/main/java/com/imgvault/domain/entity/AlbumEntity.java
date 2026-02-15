@@ -12,7 +12,9 @@ public class AlbumEntity {
     private String name;
     private String description;
     private Long coverImageId;
+    private Long ownerId;
     private Integer imageCount;
+    private Integer accessLevel;
     private String createdAt;
     private String updatedAt;
 }

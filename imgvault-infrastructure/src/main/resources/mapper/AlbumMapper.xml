@@ -7,14 +7,16 @@
         <result column="name" property="name"/>
         <result column="description" property="description"/>
         <result column="cover_image_id" property="coverImageId"/>
+        <result column="owner_id" property="ownerId"/>
         <result column="image_count" property="imageCount"/>
+        <result column="access_level" property="accessLevel"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO img_album (name, description, cover_image_id)
-        VALUES (#{name}, #{description}, #{coverImageId})
+        INSERT INTO img_album (name, description, cover_image_id, owner_id, access_level)
+        VALUES (#{name}, #{description}, #{coverImageId}, #{ownerId}, #{accessLevel})
     </insert>
 
     <select id="findById" resultMap="BaseResultMap">

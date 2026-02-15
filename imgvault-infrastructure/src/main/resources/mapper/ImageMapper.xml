@@ -72,6 +72,9 @@
         <if test="format != null and format != ''">
             AND format = #{format}
         </if>
+        <if test="keyword != null and keyword != ''">
+            AND original_name LIKE '%' || #{keyword} || '%'
+        </if>
         ORDER BY
         <choose>
             <when test="sortBy == 'file_size'">file_size</when>
@@ -95,6 +98,29 @@
         <if test="format != null and format != ''">
             AND format = #{format}
         </if>
+        <if test="keyword != null and keyword != ''">
+            AND original_name LIKE '%' || #{keyword} || '%'
+        </if>
+    </select>
+
+    <!-- 各状态统计 -->
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*) FROM img_image WHERE status = #{status}
+    </select>
+
+    <!-- 存储空间总量 -->
+    <select id="sumFileSize" resultType="long">
+        SELECT COALESCE(SUM(file_size), 0) FROM img_image WHERE status = 1
+    </select>
+
+    <!-- 格式分布 -->
+    <select id="countByFormat" resultType="java.util.Map">
+        SELECT format, COUNT(*) as cnt FROM img_image WHERE status = 1 GROUP BY format
+    </select>
+
+    <!-- 今日上传数 -->
+    <select id="countTodayUploads" resultType="long">
+        SELECT COUNT(*) FROM img_image WHERE status = 1 AND date(created_at) = date('now')
     </select>
 
     <update id="updateStatus">

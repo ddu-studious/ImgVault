@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgVault - Demo 3: 极简仓库</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #fafafa;
+            --surface: #fff;
+            --text: #111;
+            --text-muted: #999;
+            --accent: #111;
+            --border: #eee;
+            --radius: 8px;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+        /* Top bar - 超极简 */
+        .topbar { padding: 20px 48px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); background: var(--surface); }
+        .brand { font-size: 16px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+        .topbar-right { display: flex; gap: 20px; align-items: center; font-size: 14px; color: var(--text-muted); }
+        .topbar-right a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; cursor: pointer; }
+        .topbar-right a:hover { color: var(--text); }
+        .upload-trigger { background: var(--accent); color: #fff; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; font-size: 13px; letter-spacing: 0.5px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 32px; padding: 0 48px; border-bottom: 1px solid var(--border); background: var(--surface); }
+        .tab { padding: 14px 0; font-size: 13px; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; letter-spacing: 0.3px; }
+        .tab:hover, .tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+        /* Toolbar */
+        .toolbar { padding: 16px 48px; display: flex; justify-content: space-between; align-items: center; }
+        .info { font-size: 13px; color: var(--text-muted); }
+        .sort-select { background: none; border: 1px solid var(--border); padding: 6px 12px; border-radius: 4px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+
+        /* Table View */
+        .table { width: 100%; padding: 0 48px; }
+        .table-row { display: grid; grid-template-columns: 60px 1fr 120px 120px 100px 80px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 16px; font-size: 13px; transition: background 0.15s; }
+        .table-row:hover { background: rgba(0,0,0,0.02); }
+        .table-header { font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .table-header:hover { background: transparent; }
+        .thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
+        .file-name { font-weight: 500; }
+        .file-dim { color: var(--text-muted); }
+        .file-size { color: var(--text-muted); }
+        .file-date { color: var(--text-muted); }
+        .file-actions { display: flex; gap: 8px; }
+        .action-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; opacity: 0.4; transition: opacity 0.2s; }
+        .action-btn:hover { opacity: 1; }
+
+        /* Grid Mode */
+        .grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px; padding: 0 48px; }
+        .grid-item { aspect-ratio: 1; overflow: hidden; cursor: pointer; position: relative; }
+        .grid-item:hover .grid-overlay { opacity: 1; }
+        .grid-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: end; padding: 12px; opacity: 0; transition: opacity 0.2s; }
+        .grid-overlay span { color: #fff; font-size: 12px; }
+
+        /* Upload area */
+        .upload-area { margin: 32px 48px; border: 1px dashed #ccc; padding: 64px; text-align: center; display: none; }
+        .upload-area.visible { display: block; }
+        .upload-area h3 { font-weight: 400; font-size: 16px; margin-bottom: 8px; }
+        .upload-area p { color: var(--text-muted); font-size: 13px; }
+
+        @media (max-width: 768px) {
+            .topbar, .tabs, .toolbar, .table, .grid-view { padding-left: 16px; padding-right: 16px; }
+            .table-row { grid-template-columns: 48px 1fr 80px 60px; }
+            .table-row .file-dim, .table-row .file-date { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">ImgVault</div>
+        <div class="topbar-right">
+            <a onclick="toggleUpload()">上传</a>
+            <a>相册</a>
+            <a>标签</a>
+            <a>统计</a>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active">全部文件</div>
+        <div class="tab">图片</div>
+        <div class="tab">GIF</div>
+        <div class="tab">最近上传</div>
+        <div class="tab">回收站</div>
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+        <h3>将文件拖放到此处上传</h3>
+        <p>支持 JPEG, PNG, GIF, WebP, BMP · 最大 50MB</p>
+    </div>
+
+    <div class="toolbar">
+        <div class="info"><span id="count">8</span> 个文件</div>
+        <select class="sort-select">
+            <option>最新上传</option>
+            <option>文件名</option>
+            <option>文件大小</option>
+        </select>
+    </div>
+
+    <div class="table" id="tableView">
+        <div class="table-row table-header">
+            <div></div>
+            <div>文件名</div>
+            <div>尺寸</div>
+            <div>大小</div>
+            <div>日期</div>
+            <div></div>
+        </div>
+    </div>
+
+    <script>
+        // 风格说明：极简文件管理器风格，表格/网格双视图，黑白配色，高信息密度
+        const mockFiles = [
+            { name: 'sunset-beach.jpg', dim: '1920x1080', size: '2.1 MB', date: '02-14', color: '#e74c3c' },
+            { name: 'mountain-lake.png', dim: '4000x3000', size: '3.5 MB', date: '02-14', color: '#2ecc71' },
+            { name: 'city-night.jpg', dim: '1600x900', size: '1.8 MB', date: '02-13', color: '#3498db' },
+            { name: 'pink-flower.webp', dim: '800x1200', size: '0.9 MB', date: '02-13', color: '#e91e63' },
+            { name: 'blue-ocean.jpg', dim: '3840x2160', size: '4.2 MB', date: '02-12', color: '#00bcd4' },
+            { name: 'green-forest.png', dim: '2560x1440', size: '2.7 MB', date: '02-12', color: '#4caf50' },
+            { name: 'starry-night.jpg', dim: '5120x2880', size: '5.1 MB', date: '02-11', color: '#1a237e' },
+            { name: 'orange-cat.gif', dim: '600x400', size: '1.2 MB', date: '02-11', color: '#ff9800' },
+        ];
+
+        const table = document.getElementById('tableView');
+        mockFiles.forEach(f => {
+            table.innerHTML += `
+                <div class="table-row">
+                    <div><div class="thumb" style="background:${f.color}"></div></div>
+                    <div class="file-name">${f.name}</div>
+                    <div class="file-dim">${f.dim}</div>
+                    <div class="file-size">${f.size}</div>
+                    <div class="file-date">${f.date}</div>
+                    <div class="file-actions">
+                        <button class="action-btn" title="下载">⬇</button>
+                        <button class="action-btn" title="删除">🗑</button>
+                    </div>
+                </div>`;
+        });
+
+        function toggleUpload() {
+            document.getElementById('uploadArea').classList.toggle('visible');
+        }
+    </script>
+</body>
+</html>

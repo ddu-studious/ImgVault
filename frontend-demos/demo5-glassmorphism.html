@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgVault - Demo 5: 毛玻璃风格</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --glass: rgba(255,255,255,0.08);
+            --glass-border: rgba(255,255,255,0.12);
+            --text: #fff;
+            --text-muted: rgba(255,255,255,0.5);
+            --accent: #a855f7;
+            --accent2: #ec4899;
+            --radius: 16px;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; color: var(--text); min-height: 100vh; background: #0a0a1a; overflow-x: hidden; }
+        body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse at 20% 50%, rgba(168,85,247,0.15), transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(236,72,153,0.12), transparent 50%), radial-gradient(ellipse at 50% 90%, rgba(59,130,246,0.1), transparent 50%); z-index: -1; }
+
+        /* Header */
+        .header { background: var(--glass); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 6px; }
+        .nav-pill { background: transparent; border: 1px solid var(--glass-border); color: var(--text-muted); padding: 7px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .nav-pill:hover, .nav-pill.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; }
+        .upload-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; padding: 9px 22px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+        /* Stats Row */
+        .stats-row { display: flex; gap: 16px; padding: 24px 40px; }
+        .stat-glass { flex: 1; background: var(--glass); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; text-align: center; }
+        .stat-num { font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #fff, rgba(255,255,255,0.7)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Gallery */
+        .gallery-container { padding: 0 40px 40px; }
+        .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+        .gcard { background: var(--glass); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: var(--radius); overflow: hidden; transition: all 0.3s; cursor: pointer; }
+        .gcard:hover { transform: translateY(-4px) scale(1.01); border-color: rgba(168,85,247,0.4); box-shadow: 0 12px 40px rgba(168,85,247,0.15); }
+        .gcard-img { height: 200px; position: relative; }
+        .gcard-format { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+        .gcard-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+        .gcard:hover .gcard-actions { opacity: 1; }
+        .gcard-action { width: 28px; height: 28px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+        .gcard-body { padding: 14px 16px; }
+        .gcard-name { font-size: 13px; font-weight: 600; }
+        .gcard-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+        .gcard-tags { display: flex; gap: 4px; margin-top: 8px; }
+        .gtag { background: rgba(168,85,247,0.15); color: var(--accent); padding: 2px 10px; border-radius: 10px; font-size: 10px; border: 1px solid rgba(168,85,247,0.3); }
+
+        /* Upload Modal */
+        .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal-bg.active { display: flex; }
+        .modal-glass { background: rgba(30,30,50,0.9); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 36px; width: 480px; max-width: 90vw; }
+        .modal-glass h2 { font-size: 20px; margin-bottom: 20px; }
+        .drop-glass { border: 2px dashed var(--glass-border); border-radius: var(--radius); padding: 48px 24px; text-align: center; transition: all 0.3s; }
+        .drop-glass:hover { border-color: var(--accent); }
+
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; }
+            .stats-row { flex-wrap: wrap; padding: 16px; }
+            .stat-glass { min-width: calc(50% - 8px); }
+            .gallery-container { padding: 0 16px 24px; }
+            .gallery { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">ImgVault</div>
+        <div class="nav">
+            <button class="nav-pill active">全部</button>
+            <button class="nav-pill">相册</button>
+            <button class="nav-pill">标签</button>
+            <button class="nav-pill">收藏</button>
+        </div>
+        <button class="upload-btn" onclick="toggleModal()">+ 上传</button>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-glass"><div class="stat-num">1,247</div><div class="stat-label">图片总数</div></div>
+        <div class="stat-glass"><div class="stat-num">4.8G</div><div class="stat-label">存储空间</div></div>
+        <div class="stat-glass"><div class="stat-num">12</div><div class="stat-label">相册</div></div>
+        <div class="stat-glass"><div class="stat-num">38</div><div class="stat-label">标签</div></div>
+    </div>
+
+    <div class="gallery-container">
+        <div class="section-title">最近上传</div>
+        <div class="gallery" id="gallery"></div>
+    </div>
+
+    <div class="modal-bg" id="modal">
+        <div class="modal-glass">
+            <h2>上传图片</h2>
+            <div class="drop-glass">
+                <div style="font-size:48px;margin-bottom:12px">✨</div>
+                <div style="font-size:15px;font-weight:500">拖放图片到此处</div>
+                <div style="color:var(--text-muted);font-size:12px;margin-top:8px">JPEG / PNG / GIF / WebP / BMP · 最大 50MB</div>
+                <button class="upload-btn" style="margin-top:20px">选择文件</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 风格说明：暗色毛玻璃(Glassmorphism)风格，紫粉渐变色调，科技感
+        const mockPhotos = [
+            { name: 'aurora-sky.jpg', dim: '1920x1080', size: '2.1 MB', format: 'JPEG', tags: ['风景'], color: 'linear-gradient(135deg, #667eea, #764ba2)' },
+            { name: 'neon-city.png', dim: '4000x3000', size: '3.5 MB', format: 'PNG', tags: ['城市', '夜景'], color: 'linear-gradient(135deg, #f093fb, #f5576c)' },
+            { name: 'crystal-lake.jpg', dim: '1600x900', size: '1.8 MB', format: 'JPEG', tags: ['风景'], color: 'linear-gradient(135deg, #4facfe, #00f2fe)' },
+            { name: 'cherry-blossom.webp', dim: '800x1200', size: '0.9 MB', format: 'WebP', tags: ['花卉'], color: 'linear-gradient(135deg, #fa709a, #fee140)' },
+            { name: 'deep-space.jpg', dim: '3840x2160', size: '4.2 MB', format: 'JPEG', tags: ['星空'], color: 'linear-gradient(135deg, #0c3483, #a855f7)' },
+            { name: 'emerald-forest.png', dim: '2560x1440', size: '2.7 MB', format: 'PNG', tags: ['自然'], color: 'linear-gradient(135deg, #11998e, #38ef7d)' },
+            { name: 'golden-hour.jpg', dim: '5120x2880', size: '5.1 MB', format: 'JPEG', tags: ['日落'], color: 'linear-gradient(135deg, #f2994a, #f2c94c)' },
+            { name: 'snow-mountain.jpg', dim: '3000x2000', size: '3.8 MB', format: 'JPEG', tags: ['山脉'], color: 'linear-gradient(135deg, #e0eafc, #cfdef3)' },
+        ];
+
+        const gallery = document.getElementById('gallery');
+        mockPhotos.forEach(p => {
+            gallery.innerHTML += `
+                <div class="gcard">
+                    <div class="gcard-img" style="background:${p.color}">
+                        <span class="gcard-format">${p.format}</span>
+                        <div class="gcard-actions">
+                            <button class="gcard-action" title="下载">⬇</button>
+                            <button class="gcard-action" title="收藏">⭐</button>
+                        </div>
+                    </div>
+                    <div class="gcard-body">
+                        <div class="gcard-name">${p.name}</div>
+                        <div class="gcard-meta"><span>${p.dim}</span><span>${p.size}</span></div>
+                        <div class="gcard-tags">${p.tags.map(t => `<span class="gtag">${t}</span>`).join('')}</div>
+                    </div>
+                </div>`;
+        });
+
+        function toggleModal() { document.getElementById('modal').classList.toggle('active'); }
+        document.getElementById('modal').onclick = e => { if (e.target.id === 'modal') toggleModal(); };
+    </script>
+</body>
+</html>

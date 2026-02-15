@@ -14,4 +14,10 @@ public class ImageQueryRequest extends PageQuery {
 
     @Schema(description = "格式过滤: jpeg/png/gif/webp/bmp", example = "jpeg")
     private String format;
+
+    @Schema(description = "状态过滤: 0-删除 1-正常 2-审核中（null=仅正常）", example = "1")
+    private Integer status;
+
+    @Schema(description = "关键词搜索（文件名模糊匹配）", example = "sunset")
+    private String keyword;
 }

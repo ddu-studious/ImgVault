@@ -38,6 +38,7 @@ public class AlbumAppService {
         AlbumEntity entity = new AlbumEntity();
         entity.setName(name.trim());
         entity.setDescription(description);
+        entity.setOwnerId(0L);  // 默认所有者（后续可替换为认证用户ID）
         entity.setImageCount(0);
         albumRepository.insert(entity);
 

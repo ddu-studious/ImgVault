@@ -34,18 +34,19 @@ public interface ImageRepository {
      *
      * @param format   格式过滤（可选）
      * @param status   状态过滤
+     * @param keyword  关键词搜索（文件名模糊匹配，可选）
      * @param sortBy   排序字段
      * @param sortOrder 排序方向
      * @param offset   偏移量
      * @param limit    每页大小
      * @return 图片列表
      */
-    List<ImageEntity> findPage(String format, Integer status, String sortBy, String sortOrder, int offset, int limit);
+    List<ImageEntity> findPage(String format, Integer status, String keyword, String sortBy, String sortOrder, int offset, int limit);
 
     /**
      * 查询总数
      */
-    long count(String format, Integer status);
+    long count(String format, Integer status, String keyword);
 
     /**
      * 更新图片状态（软删除）
@@ -71,4 +72,10 @@ public interface ImageRepository {
      * 增加浏览次数
      */
     int incrementViewCount(Long id);
+
+    // ===== Admin 统计 =====
+    long countByStatus(Integer status);
+    long sumFileSize();
+    java.util.List<java.util.Map<String, Object>> countByFormat();
+    long countTodayUploads();
 }
