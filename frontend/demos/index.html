@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ImgVault - 画廊布局 Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#1a1a1c;color:#f5f5f7;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:60px 24px}
+h1{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:8px}
+p{color:#86868b;margin-bottom:40px;font-size:15px}
+.demos{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;width:100%;max-width:1200px}
+.demo-card{background:#2c2c2e;border-radius:16px;overflow:hidden;cursor:pointer;transition:all .3s ease;text-decoration:none;color:#f5f5f7}
+.demo-card:hover{transform:translateY(-6px);box-shadow:0 16px 48px rgba(0,0,0,.4)}
+.demo-preview{height:180px;display:flex;align-items:center;justify-content:center;font-size:60px;background:linear-gradient(135deg,#2c2c2e,#3a3a3c)}
+.demo-info{padding:16px 20px}
+.demo-name{font-size:16px;font-weight:600;margin-bottom:4px}
+.demo-desc{font-size:12px;color:#86868b;line-height:1.5}
+.demo-tag{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(41,151,255,.15);color:#2997ff}
+a.back{color:#2997ff;margin-top:40px;font-size:13px;text-decoration:none}
+</style>
+</head>
+<body>
+<h1>ImgVault Gallery Demos</h1>
+<p>5 种画廊布局风格，点击查看效果后选择你喜欢的</p>
+<div class="demos">
+    <a class="demo-card" href="demo-waterfall.html"><div class="demo-preview">🏔</div><div class="demo-info"><div class="demo-name">Demo 1: 瀑布流</div><div class="demo-desc">Pinterest 风格，多列交错排列，根据图片自然比例显示不同高度。</div><div class="demo-tag">CSS Columns</div></div></a>
+    <a class="demo-card" href="demo-justified.html"><div class="demo-preview">📸</div><div class="demo-info"><div class="demo-name">Demo 2: 对齐排列</div><div class="demo-desc">Google Photos / Flickr 风格，每行图片自动对齐填满宽度，保持原始比例。</div><div class="demo-tag">Flexbox Rows</div></div></a>
+    <a class="demo-card" href="demo-carousel.html"><div class="demo-preview">🎠</div><div class="demo-info"><div class="demo-name">Demo 3: 走马灯</div><div class="demo-desc">单张大图展示 + 缩略图条导航，支持键盘左右切换。适合精品图集浏览。</div><div class="demo-tag">Carousel</div></div></a>
+    <a class="demo-card" href="demo-bento.html"><div class="demo-preview">🍱</div><div class="demo-info"><div class="demo-name">Demo 4: 便当盒</div><div class="demo-desc">Apple 风格混合网格，重点图片占大格，其余均匀排列，像杂志封面般有层次。</div><div class="demo-tag">CSS Grid Span</div></div></a>
+    <a class="demo-card" href="demo-hover.html"><div class="demo-preview">🔍</div><div class="demo-info"><div class="demo-name">Demo 5: 悬浮展开</div><div class="demo-desc">等比正方格子，鼠标悬停放大并显示详情浮层。干净极简的现代风格。</div><div class="demo-tag">Hover Transform</div></div></a>
+</div>
+<a class="back" href="/imgvault/">&larr; 返回 ImgVault</a>
+</body>
+</html>

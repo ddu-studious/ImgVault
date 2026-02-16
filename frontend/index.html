@@ -10,49 +10,19 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <a class="logo" href="javascript:navigateTo('images')">
+        <a class="logo" href="javascript:loadImages(1)">
             <div class="logo-icon">V</div>
             ImgVault
         </a>
         <input class="search-box" id="searchBox" type="text" placeholder="搜索图片...">
         <div class="header-actions">
-            <button class="btn btn-outline btn-sm" onclick="batchDelete()" title="批量删除选中">🗑 批量删除</button>
+            <button class="btn-icon theme-toggle" onclick="toggleTheme()" id="themeToggle" title="跟随系统">💻</button>
             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">+ 上传图片</button>
         </div>
     </div>
 
     <!-- Layout -->
     <div class="layout">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-title">浏览</div>
-                <div class="sidebar-item active" id="nav-images" onclick="navigateTo('images')">
-                    <span class="sidebar-icon">🖼</span> 全部图片
-                    <span class="sidebar-count" id="imageCount">0</span>
-                </div>
-                <div class="sidebar-item" id="nav-trash" onclick="navigateTo('trash')">
-                    <span class="sidebar-icon">🗑</span> 回收站
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-title" style="display:flex;justify-content:space-between;align-items:center">
-                    相册
-                    <button class="btn btn-sm btn-outline" onclick="showCreateAlbum()" style="font-size:11px;padding:2px 8px">+</button>
-                </div>
-                <div id="albumList"></div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-title" style="display:flex;justify-content:space-between;align-items:center">
-                    标签
-                    <button class="btn btn-sm btn-outline" onclick="showCreateTag()" style="font-size:11px;padding:2px 8px">+</button>
-                </div>
-                <div id="tagList"></div>
-            </div>
-        </div>
-
         <!-- Content -->
         <div class="content">
             <!-- Upload Zone -->
@@ -74,7 +44,7 @@
                 </div>
             </div>
 
-            <!-- Grid -->
+            <!-- Waterfall Grid -->
             <div class="grid" id="grid">
                 <div class="loading"><div class="spinner"></div></div>
             </div>
@@ -82,6 +52,29 @@
             <!-- Pagination -->
             <div class="pagination" id="pagination"></div>
         </div>
+    </div>
+
+    <!-- Lightbox (走马灯全屏浏览) -->
+    <div class="lightbox" id="lightbox">
+        <div class="lightbox-header">
+            <button class="lightbox-close" onclick="closeLightbox()" title="关闭">&times;</button>
+            <span class="lightbox-counter" id="lbCounter"></span>
+            <div class="lightbox-actions">
+                <button onclick="openDetailFromLightbox()">详情</button>
+                <button onclick="downloadFromLightbox()">下载</button>
+                <button onclick="copyLightboxLink()">复制链接</button>
+            </div>
+        </div>
+        <div class="lightbox-main" id="lbMain">
+            <button class="lightbox-nav prev" onclick="lbPrev()">‹</button>
+            <img id="lbImage" src="" alt="">
+            <button class="lightbox-nav next" onclick="lbNext()">›</button>
+        </div>
+        <div class="lightbox-info" id="lbInfo">
+            <div class="lightbox-info-name" id="lbName"></div>
+            <div class="lightbox-info-meta" id="lbMeta"></div>
+        </div>
+        <div class="lightbox-thumbs" id="lbThumbs"></div>
     </div>
 
     <!-- Detail Modal -->

@@ -1,5 +1,6 @@
 package com.imgvault.api.controller;
 
+import com.imgvault.api.config.AdminTokenUtil;
 import com.imgvault.app.service.AsyncTaskService;
 import com.imgvault.app.service.ImageAppService;
 import com.imgvault.app.service.OperationLogService;
@@ -12,8 +13,9 @@ import com.imgvault.domain.entity.OperationLogEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,27 @@ public class AdminController {
     private final AsyncTaskService asyncTaskService;
     private final OperationLogService operationLogService;
     private final TagAppService tagAppService;
+    private final AdminTokenUtil adminTokenUtil;
+
+    @Value("${admin.password:imgvault-admin}")
+    private String adminPassword;
+
+    @Value("${admin.jwt.expire-hours:24}")
+    private int expireHours;
+
+    @PostMapping("/login")
+    @Operation(summary = "管理员登录", description = "验证密码后返回 Token")
+    public Result<?> login(@RequestBody Map<String, String> req) {
+        String password = req.get("password");
+        if (password != null && password.equals(adminPassword)) {
+            String token = adminTokenUtil.generateToken();
+            Map<String, Object> data = new HashMap<>();
+            data.put("token", token);
+            data.put("expiresIn", expireHours * 3600);
+            return Result.success(data);
+        }
+        return Result.fail(401, "密码错误");
+    }
 
     @GetMapping("/images")
     public Result<PageResult<ImageDetailDTO>> listImages(@javax.validation.Valid ImageQueryRequest request) {

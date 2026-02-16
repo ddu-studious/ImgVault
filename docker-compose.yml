@@ -41,11 +41,13 @@ services:
       IMGPROXY_KEY: "${IMGPROXY_KEY:-943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881}"
       IMGPROXY_SALT: "${IMGPROXY_SALT:-520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5}"
 
-      # 性能调优（低资源环境）
-      IMGPROXY_CONCURRENCY: "2"
+      # 性能调优
+      IMGPROXY_WORKERS: "4"
+      IMGPROXY_REQUESTS_QUEUE_SIZE: "64"
       IMGPROXY_MAX_SRC_RESOLUTION: "50"
       IMGPROXY_MAX_ANIMATION_FRAMES: "100"
       IMGPROXY_DOWNLOAD_BUFFER_SIZE: "1048576"
+      IMGPROXY_TTL: "2592000"
 
       # 内存优化
       IMGPROXY_MALLOC: "jemalloc"
@@ -53,8 +55,8 @@ services:
       MALLOC_ARENA_MAX: "2"
 
       # 格式支持
-      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
-      IMGPROXY_ENABLE_AVIF_DETECTION: "true"
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_AUTO_AVIF: "true"
       IMGPROXY_PREFERRED_FORMATS: "avif,webp,jpeg"
     depends_on:
       minio:
@@ -63,9 +65,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
         reservations:
-          memory: 64M
+          memory: 128M
 
 volumes:
   minio-data:

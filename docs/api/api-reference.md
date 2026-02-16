@@ -1,9 +1,10 @@
 # ImgVault API 接口文档
 
 **版本**: v2.1.0  
-**基础路径**: `http://{host}:8080`  
-**Swagger UI**: `http://{host}:8080/swagger-ui.html`  
-**OpenAPI JSON**: `http://{host}:8080/v3/api-docs`
+**基础路径**: `https://www.meczyc6.info/imgvault/api/v1`  
+**Swagger UI**: `https://www.meczyc6.info/imgvault/swagger-ui.html`  
+**OpenAPI JSON**: `https://www.meczyc6.info/imgvault/v3/api-docs`  
+**内部路径**: `http://localhost:8080`（仅限服务器本地访问）
 
 ## 目录
 
@@ -516,7 +517,7 @@ GET /api/v1/images/{id}/process
 
 ```bash
 # 生成 300x300 WebP 缩略图
-curl -L "http://localhost:8080/api/v1/images/1/process?width=300&height=300&format=webp&quality=80"
+curl -L "https://www.meczyc6.info/imgvault/api/v1/images/1/process?width=300&height=300&format=webp&quality=80"
 ```
 
 ---

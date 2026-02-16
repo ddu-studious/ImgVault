@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo 4: 便当盒 (Bento Grid)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#1a1a1c;color:#f5f5f7;min-height:100vh}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(44,44,46,.72);backdrop-filter:blur(20px);position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.06)}
+.topbar a{color:#2997ff;text-decoration:none;font-size:13px}
+.topbar span{font-size:14px;font-weight:600}
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:180px;gap:8px;padding:16px}
+.card{position:relative;border-radius:12px;overflow:hidden;cursor:pointer}
+.card img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+.card:hover img{transform:scale(1.06)}
+.card .overlay{position:absolute;inset:0;background:linear-gradient(transparent 40%,rgba(0,0,0,.75));opacity:0;transition:opacity .3s;display:flex;flex-direction:column;justify-content:flex-end;padding:14px}
+.card:hover .overlay{opacity:1}
+.overlay .name{font-size:13px;font-weight:600;margin-bottom:2px}
+.overlay .meta{font-size:10px;color:rgba(255,255,255,.6)}
+.card.xl{grid-column:span 2;grid-row:span 2}
+.card.wide{grid-column:span 2}
+.card.tall{grid-row:span 2}
+.loading{text-align:center;padding:60px;color:#86868b;grid-column:1/-1}
+@media(max-width:768px){.gallery{grid-template-columns:repeat(2,1fr);grid-auto-rows:140px}.card.xl{grid-column:span 2;grid-row:span 2}.card.wide{grid-column:span 2}.card.tall{grid-row:span 1}}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="index.html">&larr; 返回列表</a><span>Demo 4: 便当盒</span><span></span></div>
+<div class="gallery" id="g"><div class="loading">加载中...</div></div>
+<script>
+function px(u){if(!u)return'';const c=u.split('?')[0];if(c.includes('/imgvault/storage/')||c.includes('/imgvault/imgproxy/'))return c;const m1=c.match(/https?:\/\/[^/]+:8081\/(.+)/);if(m1)return'/imgvault/imgproxy/'+m1[1];const m2=c.match(/https?:\/\/[^/]+\/imgvault\/(.+)/);if(m2)return'/imgvault/storage/'+m2[1];return u;}
+function fs(b){if(!b)return'-';if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+const pattern=['xl','','','','wide','','tall','','','','wide','','','','xl','','','','',''];
+async function init(){
+    const r=await fetch('/imgvault/api/v1/images?page=1&size=20').then(r=>r.json());
+    if(r.code!==200)return;
+    document.getElementById('g').innerHTML=r.data.records.map((i,idx)=>{
+        const src=px((i.thumbnails&&i.thumbnails.medium)||i.downloadUrl);
+        const cls=pattern[idx%pattern.length];
+        return`<div class="card ${cls}"><img src="${src}" loading="lazy"><div class="overlay"><div class="name">${i.originalName||'untitled'}</div><div class="meta">${i.width}×${i.height} · ${fs(i.fileSize)}</div></div></div>`;
+    }).join('');
+}
+init();
+</script>
+</body>
+</html>

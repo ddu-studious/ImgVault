@@ -1,25 +1,28 @@
 /**
- * ImgVault Frontend - 图片存储管理前端
- * 纯 Vanilla JS 单页应用，对接 ImgVault REST API
+ * ImgVault Frontend - 图片管理用户端
+ * 瀑布流布局 + 悬浮效果 + 走马灯灯箱浏览
  */
 
 // ==================== 配置 ====================
 const BASE = '/imgvault/api/v1';
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 24;
 
 /**
- * 将 MinIO 直接 URL 转换为 nginx 代理 URL
- * http://localhost:9000/imgvault/originals/... → /imgvault/storage/originals/...
+ * 处理图片 URL
+ * 1. 后端已配置 external-url，返回的 URL 已经是 https 域名格式，直接使用
+ * 2. 兼容旧版本: 如果仍返回 localhost URL，转换为 nginx 代理路径
  */
 function proxyImageUrl(url) {
     if (!url) return '';
-    // 去掉查询参数（presigned URL 签名），bucket 已设为公开读取
     const cleanUrl = url.split('?')[0];
-    // 匹配 imgproxy URL: http://localhost:8081/签名/参数/plain/s3://...
-    // 需要提取 host:port 后面的全部路径
+    // 已经是当前域名的 URL，直接返回（去掉 presigned 签名参数）
+    if (cleanUrl.includes('/imgvault/storage/') || cleanUrl.includes('/imgvault/imgproxy/')) {
+        return cleanUrl;
+    }
+    // 兼容: 匹配 imgproxy URL: http://localhost:8081/签名/参数/plain/s3://...
     const imgproxyMatch = cleanUrl.match(/https?:\/\/[^/]+:8081\/(.+)/);
     if (imgproxyMatch) return '/imgvault/imgproxy/' + imgproxyMatch[1];
-    // 匹配 MinIO URL: http://localhost:9000/imgvault/path
+    // 兼容: 匹配 MinIO URL: http://localhost:9000/imgvault/path
     const minioMatch = cleanUrl.match(/https?:\/\/[^/]+\/imgvault\/(.+)/);
     if (minioMatch) return '/imgvault/storage/' + minioMatch[1];
     return url;
@@ -27,19 +30,51 @@ function proxyImageUrl(url) {
 
 // ==================== 状态 ====================
 const state = {
-    currentView: 'images',     // images | albums | tags | trash
     images: [],
-    tags: [],
-    albums: [],
     currentPage: 1,
     totalPages: 0,
     totalCount: 0,
-    selectedImages: new Set(),
     searchKeyword: '',
-    currentAlbumId: null,
-    currentTagId: null,
-    stats: null,
+    lbIndex: 0,
 };
+
+// ==================== 主题 ====================
+function initTheme() {
+    const saved = localStorage.getItem('imgvault-theme') || 'system';
+    applyTheme(saved);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if ((localStorage.getItem('imgvault-theme') || 'system') === 'system') {
+            applyTheme('system');
+        }
+    });
+}
+
+function applyTheme(mode) {
+    if (mode === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', mode);
+    }
+    updateThemeIcon(mode);
+}
+
+function toggleTheme() {
+    const modes = ['light', 'dark', 'system'];
+    const current = localStorage.getItem('imgvault-theme') || 'system';
+    const next = modes[(modes.indexOf(current) + 1) % modes.length];
+    localStorage.setItem('imgvault-theme', next);
+    applyTheme(next);
+}
+
+function updateThemeIcon(mode) {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    const icons = { light: '☀️', dark: '🌙', system: '💻' };
+    const labels = { light: '浅色模式', dark: '深色模式', system: '跟随系统' };
+    btn.textContent = icons[mode] || '💻';
+    btn.title = labels[mode] || '跟随系统';
+}
 
 // ==================== API 工具 ====================
 async function api(path, opts = {}) {
@@ -61,12 +96,10 @@ async function api(path, opts = {}) {
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     initUploadZone();
     initSearch();
-    initSidebarNav();
     loadImages();
-    loadTags();
-    loadAlbums();
 });
 
 // ==================== 图片列表 ====================
@@ -92,56 +125,41 @@ async function loadImages(page = 1) {
     updateContentHeader('全部图片', `${state.totalCount} 张图片`);
     renderGrid(state.images);
     renderPagination();
-    updateSidebarCounts();
-}
-
-async function loadTrash(page = 1) {
-    state.currentPage = page;
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
-    const res = await api(`/admin/trash?page=${page}&size=${PAGE_SIZE}`);
-    if (!res || res.code !== 200) {
-        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🗑️</div><div class="empty-state-text">回收站为空</div></div>';
-        return;
-    }
-
-    const pageData = res.data;
-    state.images = pageData.records || [];
-    state.totalCount = pageData.total;
-    state.totalPages = pageData.pages;
-
-    updateContentHeader('回收站', `${state.totalCount} 张已删除图片`);
-    renderGrid(state.images);
-    renderPagination();
 }
 
 function renderGrid(images) {
     const grid = document.getElementById('grid');
     if (!images || images.length === 0) {
-        const viewName = state.currentView === 'trash' ? '回收站' : '图片库';
-        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📷</div><div class="empty-state-text">${viewName}为空</div><div class="empty-state-hint">上传第一张图片开始使用</div></div>`;
+        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📷</div><div class="empty-state-text">图片库为空</div><div class="empty-state-hint">上传第一张图片开始使用</div></div>';
         return;
     }
 
-    grid.innerHTML = images.map(img => {
-        // 优先使用缩略图(medium)，回退到原图
+    grid.innerHTML = images.map((img, idx) => {
         const thumbSrc = (img.thumbnails && img.thumbnails.medium) || img.downloadUrl;
         const thumbUrl = proxyImageUrl(thumbSrc);
         const ext = (img.format || 'jpg').toUpperCase();
         const sizeStr = formatSize(img.fileSize);
-        const dimStr = img.width && img.height ? `${img.width}x${img.height}` : '';
-        const isSelected = state.selectedImages.has(img.id);
+        const dimStr = img.width && img.height ? `${img.width}×${img.height}` : '';
 
         return `
-        <div class="card" data-id="${img.id}" onclick="openDetail(${img.id})">
-            <div class="card-select ${isSelected ? 'selected' : ''}" onclick="event.stopPropagation(); toggleSelect(${img.id})">
-                ${isSelected ? '✓' : ''}
+        <div class="card" data-id="${img.id}" data-idx="${idx}" onclick="openLightbox(${idx})">
+            <div class="card-img-wrap">
+                ${thumbUrl
+                    ? `<img class="card-img" src="${thumbUrl}" alt="${img.originalName || ''}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-img-placeholder\\'>🖼</div>'">`
+                    : `<div class="card-img-placeholder">🖼</div>`}
+                <span class="card-badge">${ext}</span>
+                ${dimStr ? `<span class="card-dim-badge">${dimStr}</span>` : ''}
+                <div class="card-overlay">
+                    <div class="card-overlay-info">
+                        <div class="overlay-name">${img.originalName || 'untitled'}</div>
+                        <div class="overlay-meta">
+                            <span>${dimStr}</span>
+                            <span>${sizeStr}</span>
+                            <span>${ext}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            ${thumbUrl
-                ? `<img class="card-img" src="${thumbUrl}" alt="${img.originalName || ''}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-img-placeholder\\'>🖼</div>'">`
-                : `<div class="card-img-placeholder">🖼</div>`}
-            <span class="card-badge">${ext}</span>
             <div class="card-body">
                 <div class="card-name" title="${img.originalName || ''}">${img.originalName || 'untitled'}</div>
                 <div class="card-meta"><span>${dimStr}</span><span>${sizeStr}</span></div>
@@ -149,6 +167,95 @@ function renderGrid(images) {
         </div>`;
     }).join('');
 }
+
+// ==================== Lightbox (走马灯浏览) ====================
+function openLightbox(idx) {
+    if (!state.images || !state.images[idx]) return;
+    state.lbIndex = idx;
+
+    const lb = document.getElementById('lightbox');
+    lb.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    renderLightboxThumbs();
+    showLightboxImage(idx);
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function showLightboxImage(idx) {
+    state.lbIndex = idx;
+    const img = state.images[idx];
+    if (!img) return;
+
+    const lbImg = document.getElementById('lbImage');
+    const fullSrc = proxyImageUrl(img.downloadUrl);
+    lbImg.classList.add('fade');
+    setTimeout(() => {
+        lbImg.src = fullSrc;
+        lbImg.onload = () => lbImg.classList.remove('fade');
+    }, 150);
+
+    const ext = (img.format || 'jpg').toUpperCase();
+    const dimStr = img.width && img.height ? `${img.width}×${img.height}` : '';
+    const sizeStr = formatSize(img.fileSize);
+
+    document.getElementById('lbName').textContent = img.originalName || 'untitled';
+    document.getElementById('lbMeta').innerHTML =
+        `<span>${ext}</span><span>${dimStr}</span><span>${sizeStr}</span>`;
+    document.getElementById('lbCounter').textContent =
+        `${idx + 1} / ${state.images.length}`;
+
+    document.querySelectorAll('.lightbox-thumb').forEach((t, i) =>
+        t.classList.toggle('active', i === idx));
+    document.querySelectorAll('.lightbox-thumb')[idx]?.scrollIntoView({
+        behavior: 'smooth', inline: 'center' });
+}
+
+function renderLightboxThumbs() {
+    const container = document.getElementById('lbThumbs');
+    container.innerHTML = state.images.map((img, idx) => {
+        const src = proxyImageUrl((img.thumbnails && img.thumbnails.small) || img.downloadUrl);
+        return `<img class="lightbox-thumb${idx === state.lbIndex ? ' active' : ''}" src="${src}" onclick="showLightboxImage(${idx})" loading="lazy">`;
+    }).join('');
+}
+
+function lbPrev() {
+    showLightboxImage((state.lbIndex - 1 + state.images.length) % state.images.length);
+}
+function lbNext() {
+    showLightboxImage((state.lbIndex + 1) % state.images.length);
+}
+
+function openDetailFromLightbox() {
+    const img = state.images[state.lbIndex];
+    if (img) openDetail(img.id);
+}
+function downloadFromLightbox() {
+    const img = state.images[state.lbIndex];
+    if (!img) return;
+    const url = proxyImageUrl(img.downloadUrl);
+    const a = document.createElement('a');
+    a.href = url; a.download = img.originalName || 'image'; a.click();
+}
+function copyLightboxLink() {
+    const img = state.images[state.lbIndex];
+    if (!img) return;
+    const proxied = proxyImageUrl(img.downloadUrl);
+    const url = proxied.startsWith('http') ? proxied : window.location.origin + proxied;
+    copyToClipboard(url);
+}
+
+document.addEventListener('keydown', e => {
+    const lb = document.getElementById('lightbox');
+    if (!lb.classList.contains('active')) return;
+    if (e.key === 'ArrowLeft') lbPrev();
+    if (e.key === 'ArrowRight') lbNext();
+    if (e.key === 'Escape') closeLightbox();
+});
 
 // ==================== 图片详情 ====================
 async function openDetail(id) {
@@ -159,7 +266,6 @@ async function openDetail(id) {
     }
     const img = res.data;
 
-    // 加载标签
     let tags = [];
     try {
         const tagRes = await api(`/tags/images/${id}/tags`);
@@ -169,6 +275,11 @@ async function openDetail(id) {
     const modal = document.getElementById('detailModal');
     const imgUrl = proxyImageUrl(img.downloadUrl);
     const sizeStr = formatSize(img.fileSize);
+    const ext = (img.format || '-').toUpperCase();
+    const fullLink = imgUrl.startsWith('http') ? imgUrl : window.location.origin + imgUrl;
+
+    const sizePresets = buildSizePresets(img.width, img.height);
+    const formatOptions = buildFormatOptions(img.format);
 
     document.getElementById('detailContent').innerHTML = `
         <div class="detail-layout">
@@ -179,9 +290,10 @@ async function openDetail(id) {
                 <div class="detail-section">
                     <div class="detail-section-title">文件信息</div>
                     <div class="detail-row"><span class="label">文件名</span><span class="value" title="${img.originalName}">${img.originalName || '-'}</span></div>
-                    <div class="detail-row"><span class="label">格式</span><span class="value">${(img.format || '-').toUpperCase()}</span></div>
-                    <div class="detail-row"><span class="label">尺寸</span><span class="value">${img.width && img.height ? img.width + 'x' + img.height : '-'}</span></div>
+                    <div class="detail-row"><span class="label">格式</span><span class="value">${ext}</span></div>
+                    <div class="detail-row"><span class="label">尺寸</span><span class="value">${img.width && img.height ? img.width + '×' + img.height : '-'}</span></div>
                     <div class="detail-row"><span class="label">大小</span><span class="value">${sizeStr}</span></div>
+                    <div class="detail-row"><span class="label">MIME</span><span class="value">${img.mimeType || '-'}</span></div>
                     <div class="detail-row"><span class="label">UUID</span><span class="value" title="${img.imageUuid || ''}">${(img.imageUuid || '-').substring(0, 12)}...</span></div>
                     <div class="detail-row"><span class="label">创建时间</span><span class="value">${img.createdAt || '-'}</span></div>
                 </div>
@@ -190,19 +302,196 @@ async function openDetail(id) {
                     <div class="detail-section-title">标签</div>
                     <div class="detail-tags" id="detailTags">
                         ${tags.map(t => `<span class="detail-tag">${t.name}</span>`).join('')}
-                        <button class="btn btn-sm btn-outline" onclick="showAddTagDialog(${id})">+ 添加</button>
+                        ${tags.length === 0 ? '<span style="color:var(--text-muted);font-size:12px">暂无标签</span>' : ''}
                     </div>
                 </div>
 
                 <div class="detail-actions">
-                    <a class="btn btn-primary btn-sm" href="${imgUrl}" target="_blank" download>⬇ 下载</a>
-                    <button class="btn btn-sm btn-outline" onclick="copyToClipboard('${imgUrl}')">🔗 复制链接</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteImage(${id})">🗑 删除</button>
+                    <a class="btn btn-primary btn-sm" href="${imgUrl}" target="_blank" download>⬇ 原图下载</a>
+                    <button class="btn btn-sm btn-outline" onclick="copyToClipboard('${fullLink}')">🔗 复制链接</button>
+                </div>
+
+                <div class="download-panel">
+                    <div class="download-panel-title">多规格下载</div>
+                    <div class="download-options">
+                        <div class="download-option-group">
+                            <div class="download-option-label">尺寸</div>
+                            <div class="download-chips" id="dlSizeChips">
+                                ${sizePresets.map((p, i) => `<span class="download-chip${i === 0 ? ' active' : ''}" data-w="${p.w}" data-h="${p.h}" onclick="selectDlSize(this)">${p.label}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="download-option-group">
+                            <div class="download-option-label">格式</div>
+                            <div class="download-chips" id="dlFormatChips">
+                                ${formatOptions.map((f, i) => `<span class="download-chip${i === 0 ? ' active' : ''}" data-fmt="${f.value}" onclick="selectDlFormat(this)">${f.label}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="download-option-group">
+                            <div class="download-option-label">自定义尺寸</div>
+                            <div class="download-custom">
+                                <input type="number" id="dlCustomW" placeholder="宽" min="1" max="10000">
+                                <span class="download-custom-sep">x</span>
+                                <input type="number" id="dlCustomH" placeholder="高" min="1" max="10000">
+                                <button class="download-go-btn" onclick="applyCustomSize()">应用</button>
+                            </div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:8px">
+                            <button class="btn btn-primary btn-sm" onclick="doProcessedDownload(${img.id}, '${img.originalName || 'image'}')">⬇ 下载所选规格</button>
+                            <button class="btn btn-sm btn-outline" onclick="copyProcessedLink(${img.id})">🔗 复制处理链接</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>`;
 
     modal.classList.add('active');
+}
+
+// ==================== 多规格下载 ====================
+
+function buildSizePresets(origW, origH) {
+    const presets = [{ label: '原始尺寸', w: 0, h: 0 }];
+    const sizes = [
+        { label: '大 (1920)', w: 1920, h: 1080 },
+        { label: '中 (1280)', w: 1280, h: 720 },
+        { label: '小 (800)', w: 800, h: 600 },
+        { label: '缩略 (400)', w: 400, h: 300 },
+        { label: '图标 (150)', w: 150, h: 150 },
+    ];
+    for (const s of sizes) {
+        if (origW && origH && (s.w < origW || s.h < origH)) {
+            presets.push(s);
+        }
+    }
+    if (presets.length === 1 && origW && origH) {
+        presets.push({ label: '中 (1280)', w: 1280, h: 720 });
+        presets.push({ label: '小 (800)', w: 800, h: 600 });
+    }
+    return presets;
+}
+
+function buildFormatOptions(originalFormat) {
+    const fmt = (originalFormat || '').toLowerCase();
+    const options = [{ label: '原始格式', value: '' }];
+    const all = [
+        { label: 'JPEG', value: 'jpeg' },
+        { label: 'PNG', value: 'png' },
+        { label: 'WebP', value: 'webp' },
+        { label: 'AVIF', value: 'avif' },
+    ];
+    for (const f of all) {
+        if (f.value !== fmt) options.push(f);
+    }
+    return options;
+}
+
+function selectDlSize(el) {
+    el.closest('.download-chips').querySelectorAll('.download-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    const wInput = document.getElementById('dlCustomW');
+    const hInput = document.getElementById('dlCustomH');
+    if (wInput && hInput) {
+        const w = el.dataset.w, h = el.dataset.h;
+        if (w !== '0' && h !== '0') { wInput.value = w; hInput.value = h; }
+        else { wInput.value = ''; hInput.value = ''; }
+    }
+}
+
+function selectDlFormat(el) {
+    el.closest('.download-chips').querySelectorAll('.download-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+}
+
+function applyCustomSize() {
+    const w = parseInt(document.getElementById('dlCustomW').value) || 0;
+    const h = parseInt(document.getElementById('dlCustomH').value) || 0;
+    if (w <= 0 && h <= 0) { toast('请输入有效的宽高', 'error'); return; }
+    const chips = document.getElementById('dlSizeChips');
+    chips.querySelectorAll('.download-chip').forEach(c => c.classList.remove('active'));
+    let custom = chips.querySelector('[data-custom]');
+    if (!custom) {
+        custom = document.createElement('span');
+        custom.className = 'download-chip active';
+        custom.dataset.custom = '1';
+        custom.onclick = function() { selectDlSize(this); };
+        chips.appendChild(custom);
+    }
+    custom.className = 'download-chip active';
+    custom.dataset.w = w; custom.dataset.h = h;
+    custom.textContent = `${w || 'auto'}x${h || 'auto'}`;
+    toast('已应用自定义尺寸', 'success');
+}
+
+function getSelectedDownloadParams() {
+    const sizeChip = document.querySelector('#dlSizeChips .download-chip.active');
+    const fmtChip = document.querySelector('#dlFormatChips .download-chip.active');
+    const w = sizeChip ? parseInt(sizeChip.dataset.w) || 0 : 0;
+    const h = sizeChip ? parseInt(sizeChip.dataset.h) || 0 : 0;
+    const fmt = fmtChip ? fmtChip.dataset.fmt || '' : '';
+    return { width: w, height: h, format: fmt, quality: 85 };
+}
+
+async function doProcessedDownload(imageId, originalName) {
+    const params = getSelectedDownloadParams();
+    if (params.width === 0 && params.height === 0 && !params.format) {
+        const img = state.images.find(i => i.id === imageId);
+        const url = img ? proxyImageUrl(img.downloadUrl) : `/images/${imageId}`;
+        const a = document.createElement('a');
+        a.href = url; a.download = originalName; a.click();
+        return;
+    }
+    try {
+        const qs = new URLSearchParams();
+        if (params.width > 0) qs.set('width', params.width);
+        if (params.height > 0) qs.set('height', params.height);
+        if (params.format) qs.set('format', params.format);
+        if (params.quality > 0) qs.set('quality', params.quality);
+        const res = await api(`/images/${imageId}/process-url?${qs.toString()}`);
+        if (res && res.code === 200 && res.data) {
+            const processedUrl = proxyImageUrl(res.data);
+            const ext = params.format || originalName.split('.').pop() || 'jpg';
+            const baseName = originalName.replace(/\.[^.]+$/, '');
+            const sizeSuffix = (params.width || params.height) ? `_${params.width || 'auto'}x${params.height || 'auto'}` : '';
+            const fileName = `${baseName}${sizeSuffix}.${ext}`;
+            const a = document.createElement('a');
+            a.href = processedUrl; a.download = fileName; a.target = '_blank'; a.click();
+            toast('开始下载: ' + fileName, 'success');
+        } else {
+            toast('获取处理链接失败', 'error');
+        }
+    } catch (e) {
+        toast('下载失败: ' + e.message, 'error');
+    }
+}
+
+async function copyProcessedLink(imageId) {
+    const params = getSelectedDownloadParams();
+    if (params.width === 0 && params.height === 0 && !params.format) {
+        const img = state.images.find(i => i.id === imageId);
+        if (img) {
+            const url = proxyImageUrl(img.downloadUrl);
+            const full = url.startsWith('http') ? url : window.location.origin + url;
+            copyToClipboard(full);
+        }
+        return;
+    }
+    try {
+        const qs = new URLSearchParams();
+        if (params.width > 0) qs.set('width', params.width);
+        if (params.height > 0) qs.set('height', params.height);
+        if (params.format) qs.set('format', params.format);
+        if (params.quality > 0) qs.set('quality', params.quality);
+        const res = await api(`/images/${imageId}/process-url?${qs.toString()}`);
+        if (res && res.code === 200 && res.data) {
+            const url = proxyImageUrl(res.data);
+            const full = url.startsWith('http') ? url : window.location.origin + url;
+            copyToClipboard(full);
+        } else {
+            toast('获取处理链接失败', 'error');
+        }
+    } catch (e) {
+        toast('复制失败: ' + e.message, 'error');
+    }
 }
 
 function closeModal(id) {
@@ -248,9 +537,7 @@ async function handleFiles(files) {
             formData.append('file', file);
 
             const progressFill = document.querySelector(`#${itemId} .progress-fill`);
-            const statusEl = document.querySelector(`#${itemId} .upload-item-status`);
 
-            // 使用 XMLHttpRequest 获取上传进度
             const result = await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', BASE + '/images/upload');
@@ -270,9 +557,15 @@ async function handleFiles(files) {
 
             if (result && result.code === 200) {
                 document.querySelector(`#${itemId} .progress-fill`).style.width = '100%';
-                document.querySelector(`#${itemId} .upload-item-status`).textContent = '完成';
-                document.querySelector(`#${itemId} .upload-item-status`).className = 'upload-item-status success';
-                toast(`${file.name} 上传成功`, 'success');
+                if (result.data && result.data.duplicate) {
+                    document.querySelector(`#${itemId} .upload-item-status`).textContent = '已存在';
+                    document.querySelector(`#${itemId} .upload-item-status`).className = 'upload-item-status success';
+                    toast(`${file.name} 图片已存在，跳过重复上传`, 'info');
+                } else {
+                    document.querySelector(`#${itemId} .upload-item-status`).textContent = '完成';
+                    document.querySelector(`#${itemId} .upload-item-status`).className = 'upload-item-status success';
+                    toast(`${file.name} 上传成功`, 'success');
+                }
             } else {
                 document.querySelector(`#${itemId} .upload-item-status`).textContent = '失败';
                 document.querySelector(`#${itemId} .upload-item-status`).className = 'upload-item-status error';
@@ -288,176 +581,10 @@ async function handleFiles(files) {
         }
     }
 
-    // 上传完成后刷新列表
     setTimeout(() => {
-        if (state.currentView === 'images') loadImages(1);
+        loadImages(1);
         progressContainer.innerHTML = '';
     }, 2000);
-}
-
-// ==================== 删除 ====================
-async function deleteImage(id) {
-    if (!confirm('确定要删除这张图片吗？')) return;
-    const res = await api(`/images/${id}`, { method: 'DELETE' });
-    if (res && res.code === 200) {
-        toast('图片已删除', 'success');
-        closeModal('detailModal');
-        loadImages(state.currentPage);
-    } else {
-        toast('删除失败', 'error');
-    }
-}
-
-async function batchDelete() {
-    if (state.selectedImages.size === 0) { toast('请先选择图片', 'error'); return; }
-    if (!confirm(`确定删除 ${state.selectedImages.size} 张图片吗？`)) return;
-
-    const ids = Array.from(state.selectedImages);
-    const res = await api('/admin/batch-delete', {
-        method: 'POST',
-        body: JSON.stringify(ids),
-    });
-    if (res && res.code === 200) {
-        toast(res.message || '批量删除成功', 'success');
-        state.selectedImages.clear();
-        loadImages(state.currentPage);
-    }
-}
-
-function toggleSelect(id) {
-    if (state.selectedImages.has(id)) state.selectedImages.delete(id);
-    else state.selectedImages.add(id);
-    renderGrid(state.images);
-}
-
-// ==================== 标签 ====================
-async function loadTags() {
-    const res = await api('/tags');
-    if (res && res.code === 200) {
-        state.tags = res.data || [];
-        renderTagSidebar();
-    }
-}
-
-function renderTagSidebar() {
-    const container = document.getElementById('tagList');
-    if (!container) return;
-    container.innerHTML = state.tags.map(t => `
-        <div class="sidebar-item ${state.currentView === 'tag' && state.currentTagId === t.id ? 'active' : ''}" onclick="filterByTag(${t.id}, '${t.name}')">
-            <span class="sidebar-icon">🏷</span> ${t.name}
-            <span class="sidebar-count">${t.imageCount || 0}</span>
-        </div>`).join('');
-}
-
-async function filterByTag(tagId, tagName) {
-    state.currentView = 'tag';
-    state.currentTagId = tagId;
-    updateSidebarActive();
-
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    updateContentHeader(`标签: ${tagName}`, '');
-
-    const res = await api(`/tags/${tagId}/images?page=1&size=${PAGE_SIZE}`);
-    if (!res || res.code !== 200 || !res.data.records.length) {
-        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏷</div><div class="empty-state-text">该标签下没有图片</div></div>';
-        return;
-    }
-
-    // 加载每张图片的详情
-    const imageDetails = await Promise.all(
-        res.data.records.map(id => api(`/images/${id}`).then(r => r?.data).catch(() => null))
-    );
-    const images = imageDetails.filter(Boolean);
-    updateContentHeader(`标签: ${tagName}`, `${res.data.total} 张图片`);
-    renderGrid(images);
-}
-
-function showAddTagDialog(imageId) {
-    const tagNames = state.tags.map(t => t.name).join(', ');
-    const input = prompt(`为图片添加标签（多个用逗号分隔）\n\n现有标签: ${tagNames || '无'}`);
-    if (!input) return;
-
-    const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-    api(`/tags/images/${imageId}/tags`, {
-        method: 'POST',
-        body: JSON.stringify(names),
-    }).then(res => {
-        if (res && res.code === 200) {
-            toast('标签已添加', 'success');
-            openDetail(imageId);
-            loadTags();
-        } else {
-            toast('添加失败: ' + (res?.message || ''), 'error');
-        }
-    });
-}
-
-async function showCreateTag() {
-    const name = prompt('输入新标签名称:');
-    if (!name) return;
-    const res = await api('/tags', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
-    if (res && res.code === 200) {
-        toast('标签已创建', 'success');
-        loadTags();
-    } else {
-        toast('创建失败: ' + (res?.message || ''), 'error');
-    }
-}
-
-// ==================== 相册 ====================
-async function loadAlbums() {
-    const res = await api('/albums?page=1&size=100');
-    if (res && res.code === 200) {
-        state.albums = res.data.records || [];
-        renderAlbumSidebar();
-    }
-}
-
-function renderAlbumSidebar() {
-    const container = document.getElementById('albumList');
-    if (!container) return;
-    container.innerHTML = state.albums.map(a => `
-        <div class="sidebar-item ${state.currentView === 'album' && state.currentAlbumId === a.id ? 'active' : ''}" onclick="openAlbum(${a.id}, '${a.name}')">
-            <span class="sidebar-icon">📁</span> ${a.name}
-            <span class="sidebar-count">${a.imageCount || 0}</span>
-        </div>`).join('');
-}
-
-async function openAlbum(albumId, albumName) {
-    state.currentView = 'album';
-    state.currentAlbumId = albumId;
-    updateSidebarActive();
-
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    updateContentHeader(`相册: ${albumName}`, '');
-
-    const res = await api(`/albums/${albumId}/images?page=1&size=${PAGE_SIZE}`);
-    if (!res || res.code !== 200 || !res.data.records.length) {
-        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-text">相册为空</div><div class="empty-state-hint">请从图片库添加图片到相册</div></div>';
-        return;
-    }
-
-    const imageDetails = await Promise.all(
-        res.data.records.map(id => api(`/images/${id}`).then(r => r?.data).catch(() => null))
-    );
-    const images = imageDetails.filter(Boolean);
-    updateContentHeader(`相册: ${albumName}`, `${res.data.total} 张图片`);
-    renderGrid(images);
-}
-
-async function showCreateAlbum() {
-    const name = prompt('输入新相册名称:');
-    if (!name) return;
-    const desc = prompt('相册描述（可选）:') || '';
-    const res = await api('/albums', { method: 'POST', body: JSON.stringify({ name: name.trim(), description: desc }) });
-    if (res && res.code === 200) {
-        toast('相册已创建', 'success');
-        loadAlbums();
-    } else {
-        toast('创建失败: ' + (res?.message || ''), 'error');
-    }
 }
 
 // ==================== 搜索 ====================
@@ -469,34 +596,9 @@ function initSearch() {
         clearTimeout(timer);
         timer = setTimeout(() => {
             state.searchKeyword = searchBox.value.trim();
-            if (state.currentView === 'images') loadImages(1);
+            loadImages(1);
         }, 400);
     });
-}
-
-// ==================== 侧边栏导航 ====================
-function initSidebarNav() {
-    // 由 HTML 中的 onclick 处理
-}
-
-function navigateTo(view) {
-    state.currentView = view;
-    state.currentAlbumId = null;
-    state.currentTagId = null;
-    state.selectedImages.clear();
-    updateSidebarActive();
-
-    if (view === 'images') loadImages(1);
-    else if (view === 'trash') loadTrash(1);
-}
-
-function updateSidebarActive() {
-    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-    const viewMap = { images: 'nav-images', trash: 'nav-trash' };
-    const navEl = document.getElementById(viewMap[state.currentView]);
-    if (navEl) navEl.classList.add('active');
-    renderTagSidebar();
-    renderAlbumSidebar();
 }
 
 // ==================== 分页 ====================
@@ -531,11 +633,6 @@ function updateContentHeader(title, subtitle) {
     const s = document.getElementById('contentSubtitle');
     if (t) t.textContent = title;
     if (s) s.textContent = subtitle;
-}
-
-function updateSidebarCounts() {
-    const el = document.getElementById('imageCount');
-    if (el) el.textContent = state.totalCount;
 }
 
 function formatSize(bytes) {

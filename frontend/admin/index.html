@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgVault Admin</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
+</head>
+<body>
+    <!-- Login -->
+    <div id="loginPage" class="login-page">
+        <div class="login-card">
+            <div class="login-logo"><div class="logo-icon">V</div><span>ImgVault Admin</span></div>
+            <input type="password" id="loginPassword" class="login-input" placeholder="输入管理员密码" autofocus
+                   onkeydown="if(event.key==='Enter')handleLogin()">
+            <button id="loginBtn" class="login-btn" onclick="handleLogin()">登录</button>
+        </div>
+    </div>
+
+    <!-- Admin App -->
+    <div id="adminApp" style="display:none">
+        <div class="admin-header">
+            <div class="hdr-left"><div class="logo-icon">V</div><span class="hdr-title">ImgVault <span class="badge-admin">Admin</span></span></div>
+            <div class="hdr-right">
+                <button class="btn-icon theme-toggle" onclick="toggleTheme()" id="themeToggle" title="跟随系统">💻</button>
+                <button class="btn btn-outline btn-sm" onclick="logout()">退出</button>
+            </div>
+        </div>
+        <div class="admin-layout">
+            <nav class="admin-sidebar" id="sidebar">
+                <a class="nav-item active" data-s="dashboard" onclick="navigate('dashboard')"><span class="ni">📊</span>看板</a>
+                <a class="nav-item" data-s="images" onclick="navigate('images')"><span class="ni">🖼</span>图片</a>
+                <a class="nav-item" data-s="trash" onclick="navigate('trash')"><span class="ni">🗑</span>回收站</a>
+                <a class="nav-item" data-s="tags" onclick="navigate('tags')"><span class="ni">🏷</span>标签</a>
+                <a class="nav-item" data-s="albums" onclick="navigate('albums')"><span class="ni">📁</span>相册</a>
+                <a class="nav-item" data-s="logs" onclick="navigate('logs')"><span class="ni">📋</span>日志</a>
+                <a class="nav-item" data-s="system" onclick="navigate('system')"><span class="ni">🔧</span>系统</a>
+            </nav>
+            <main class="admin-content" id="mainContent"></main>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal"><div class="modal-header"><span id="modalTitle"></span><button class="modal-close" onclick="closeModal()">&times;</button></div>
+        <div class="modal-body" id="modalBody"></div></div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script src="admin.js"></script>
+</body>
+</html>

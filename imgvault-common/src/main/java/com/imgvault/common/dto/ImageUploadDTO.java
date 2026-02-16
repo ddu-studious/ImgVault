@@ -46,4 +46,7 @@ public class ImageUploadDTO implements Serializable {
 
     @Schema(description = "文件SHA-256哈希")
     private String fileHash;
+
+    @Schema(description = "是否为重复图片（已存在相同哈希的图片）")
+    private Boolean duplicate;
 }

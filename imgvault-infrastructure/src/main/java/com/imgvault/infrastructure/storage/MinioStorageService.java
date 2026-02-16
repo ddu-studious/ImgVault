@@ -108,13 +108,22 @@ public class MinioStorageService {
 
     /**
      * 生成预签名下载 URL
+     * 如果配置了 externalUrl，将返回基于外部域名的直接访问 URL（无签名参数，bucket 已设为公开读取）
      *
      * @param storagePath 存储路径
      * @param expirySeconds 有效期（秒）
-     * @return 预签名 URL
+     * @return 下载 URL
      */
     public String getPresignedDownloadUrl(String storagePath, int expirySeconds) {
         ensureAvailable();
+
+        // 如果配置了外部 URL，直接返回基于外部域名的访问路径（无需预签名，bucket 为公开读取）
+        String externalUrl = minioConfig.getExternalUrl();
+        if (externalUrl != null && !externalUrl.isEmpty()) {
+            String base = externalUrl.endsWith("/") ? externalUrl : externalUrl + "/";
+            return base + storagePath;
+        }
+
         try {
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)

@@ -62,6 +62,30 @@ public class ImageAppService {
             String fileHash = FileHashUtil.sha256(fileBytes);
             String fileMd5 = FileHashUtil.md5(fileBytes);
 
+            // 3.5 文件指纹去重检查
+            FileFingerprintEntity existingFingerprint = fingerprintRepository.findByHash(fileHash);
+            if (existingFingerprint != null) {
+                ImageEntity existingImage = imageRepository.findByHash(fileHash);
+                if (existingImage != null && existingImage.getStatus() == ImageStatus.NORMAL.getCode()) {
+                    log.info("检测到重复文件上传: hash={}, existingId={}", fileHash, existingImage.getId());
+                    ImageUploadDTO dto = new ImageUploadDTO();
+                    dto.setId(existingImage.getId());
+                    dto.setImageUuid(existingImage.getImageUuid());
+                    dto.setOriginalName(existingImage.getOriginalName());
+                    dto.setFileSize(existingImage.getFileSize());
+                    dto.setWidth(existingImage.getWidth());
+                    dto.setHeight(existingImage.getHeight());
+                    dto.setFormat(existingImage.getFormat());
+                    dto.setMimeType(existingImage.getMimeType());
+                    dto.setStoragePath(existingImage.getStoragePath());
+                    dto.setFileHash(fileHash);
+                    dto.setDownloadUrl(storageService.getPresignedDownloadUrl(
+                            existingImage.getStoragePath(), StorageConstants.PRESIGNED_URL_EXPIRY_SECONDS));
+                    dto.setDuplicate(true);
+                    return dto;
+                }
+            }
+
             // 4. 检测 MIME 类型和格式
             String mimeType = MagicBytesValidator.detectMimeType(fileBytes);
             if (mimeType == null) {

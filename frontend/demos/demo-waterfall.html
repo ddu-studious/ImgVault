@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo 1: 瀑布流 (Waterfall/Masonry)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#1a1a1c;color:#f5f5f7;min-height:100vh}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(44,44,46,.72);backdrop-filter:blur(20px);position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.06)}
+.topbar a{color:#2997ff;text-decoration:none;font-size:13px}
+.topbar span{font-size:14px;font-weight:600}
+.gallery{columns:4 260px;column-gap:12px;padding:20px 24px}
+.card{break-inside:avoid;margin-bottom:12px;border-radius:12px;overflow:hidden;background:#2c2c2e;cursor:pointer;transition:all .3s}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.card img{width:100%;display:block}
+.card-body{padding:10px 12px}
+.card-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-meta{font-size:10px;color:#86868b;margin-top:2px;display:flex;justify-content:space-between}
+.loading{text-align:center;padding:60px;color:#86868b}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="index.html">&larr; 返回列表</a><span>Demo 1: 瀑布流</span><span></span></div>
+<div class="gallery" id="g"><div class="loading">加载中...</div></div>
+<script>
+function px(u){if(!u)return'';const c=u.split('?')[0];if(c.includes('/imgvault/storage/')||c.includes('/imgvault/imgproxy/'))return c;const m1=c.match(/https?:\/\/[^/]+:8081\/(.+)/);if(m1)return'/imgvault/imgproxy/'+m1[1];const m2=c.match(/https?:\/\/[^/]+\/imgvault\/(.+)/);if(m2)return'/imgvault/storage/'+m2[1];return u;}
+function fs(b){if(!b)return'-';if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+async function init(){
+    const r=await fetch('/imgvault/api/v1/images?page=1&size=30').then(r=>r.json());
+    if(r.code!==200)return;
+    document.getElementById('g').innerHTML=r.data.records.map(i=>{
+        const src=px((i.thumbnails&&i.thumbnails.medium)||i.downloadUrl);
+        return`<div class="card"><img src="${src}" alt="${i.originalName||''}" loading="lazy"><div class="card-body"><div class="card-name">${i.originalName||'untitled'}</div><div class="card-meta"><span>${i.width}×${i.height}</span><span>${fs(i.fileSize)}</span></div></div></div>`;
+    }).join('');
+}
+init();
+</script>
+</body>
+</html>

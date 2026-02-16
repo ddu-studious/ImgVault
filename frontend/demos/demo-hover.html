@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo 5: 悬浮展开 (Hover Zoom)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#1a1a1c;color:#f5f5f7;min-height:100vh}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(44,44,46,.72);backdrop-filter:blur(20px);position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.06)}
+.topbar a{color:#2997ff;text-decoration:none;font-size:13px}
+.topbar span{font-size:14px;font-weight:600}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;padding:4px}
+.card{position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;background:#2c2c2e}
+.card img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.25,.1,.25,1)}
+.card:hover img{transform:scale(1.12)}
+.card .overlay{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .3s;display:flex;flex-direction:column;justify-content:flex-end;padding:12px}
+.card:hover .overlay{background:rgba(0,0,0,.45)}
+.overlay .info{transform:translateY(20px);opacity:0;transition:all .3s ease .05s}
+.card:hover .overlay .info{transform:translateY(0);opacity:1}
+.info .name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info .meta{font-size:10px;color:rgba(255,255,255,.6);margin-top:2px;display:flex;justify-content:space-between}
+.info .badge{display:inline-block;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.15);font-size:9px;font-weight:600;text-transform:uppercase;margin-bottom:4px}
+.loading{text-align:center;padding:60px;color:#86868b;grid-column:1/-1}
+@media(max-width:600px){.gallery{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="index.html">&larr; 返回列表</a><span>Demo 5: 悬浮展开</span><span></span></div>
+<div class="gallery" id="g"><div class="loading">加载中...</div></div>
+<script>
+function px(u){if(!u)return'';const c=u.split('?')[0];if(c.includes('/imgvault/storage/')||c.includes('/imgvault/imgproxy/'))return c;const m1=c.match(/https?:\/\/[^/]+:8081\/(.+)/);if(m1)return'/imgvault/imgproxy/'+m1[1];const m2=c.match(/https?:\/\/[^/]+\/imgvault\/(.+)/);if(m2)return'/imgvault/storage/'+m2[1];return u;}
+function fs(b){if(!b)return'-';if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+async function init(){
+    const r=await fetch('/imgvault/api/v1/images?page=1&size=30').then(r=>r.json());
+    if(r.code!==200)return;
+    document.getElementById('g').innerHTML=r.data.records.map(i=>{
+        const src=px((i.thumbnails&&i.thumbnails.medium)||i.downloadUrl);
+        const fmt=(i.format||'jpg').toUpperCase();
+        return`<div class="card"><img src="${src}" loading="lazy"><div class="overlay"><div class="info"><span class="badge">${fmt}</span><div class="name">${i.originalName||'untitled'}</div><div class="meta"><span>${i.width}×${i.height}</span><span>${fs(i.fileSize)}</span></div></div></div></div>`;
+    }).join('');
+}
+init();
+</script>
+</body>
+</html>

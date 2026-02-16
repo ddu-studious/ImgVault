@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo 3: 走马灯 (Carousel)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:#f5f5f7;min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(44,44,46,.72);backdrop-filter:blur(20px);position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.topbar a{color:#2997ff;text-decoration:none;font-size:13px}
+.topbar span{font-size:14px;font-weight:600}
+.main{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.main img{max-width:90%;max-height:calc(100vh - 180px);object-fit:contain;border-radius:8px;transition:opacity .4s ease}
+.main img.fade{opacity:0}
+.nav-btn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.1);backdrop-filter:blur(10px);border:none;color:#fff;font-size:20px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.nav-btn:hover{background:rgba(255,255,255,.2)}
+.nav-btn.prev{left:20px}
+.nav-btn.next{right:20px}
+.info-bar{text-align:center;padding:8px;font-size:12px;color:#86868b}
+.thumbs{display:flex;gap:6px;padding:12px 20px;overflow-x:auto;justify-content:center;flex-shrink:0;background:rgba(28,28,30,.8)}
+.thumbs::-webkit-scrollbar{height:4px}
+.thumbs::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:2px}
+.thumb{width:72px;height:50px;border-radius:6px;object-fit:cover;cursor:pointer;opacity:.4;transition:all .2s;flex-shrink:0;border:2px solid transparent}
+.thumb.active{opacity:1;border-color:#2997ff}
+.thumb:hover{opacity:.8}
+.loading{text-align:center;padding:60px;color:#86868b}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="index.html">&larr; 返回列表</a><span>Demo 3: 走马灯</span><span></span></div>
+<div class="main" id="main"><div class="loading">加载中...</div></div>
+<div class="info-bar" id="info"></div>
+<div class="thumbs" id="thumbs"></div>
+<script>
+function px(u){if(!u)return'';const c=u.split('?')[0];if(c.includes('/imgvault/storage/')||c.includes('/imgvault/imgproxy/'))return c;const m1=c.match(/https?:\/\/[^/]+:8081\/(.+)/);if(m1)return'/imgvault/imgproxy/'+m1[1];const m2=c.match(/https?:\/\/[^/]+\/imgvault\/(.+)/);if(m2)return'/imgvault/storage/'+m2[1];return u;}
+let imgs=[],cur=0;
+function show(idx){
+    cur=idx;const i=imgs[idx];if(!i)return;
+    const mainEl=document.getElementById('main');
+    const img=mainEl.querySelector('img')||document.createElement('img');
+    img.className='fade';
+    setTimeout(()=>{img.src=px(i.downloadUrl);img.className='';},200);
+    if(!mainEl.querySelector('img')){mainEl.innerHTML='';mainEl.appendChild(img);
+        const p=document.createElement('button');p.className='nav-btn prev';p.textContent='‹';p.onclick=()=>show((cur-1+imgs.length)%imgs.length);mainEl.appendChild(p);
+        const n=document.createElement('button');n.className='nav-btn next';n.textContent='›';n.onclick=()=>show((cur+1)%imgs.length);mainEl.appendChild(n);
+    }
+    document.getElementById('info').textContent=`${i.originalName||'untitled'} · ${i.width}×${i.height} · ${idx+1}/${imgs.length}`;
+    document.querySelectorAll('.thumb').forEach((t,j)=>t.classList.toggle('active',j===idx));
+    document.querySelectorAll('.thumb')[idx]?.scrollIntoView({behavior:'smooth',inline:'center'});
+}
+async function init(){
+    const r=await fetch('/imgvault/api/v1/images?page=1&size=30').then(r=>r.json());
+    if(r.code!==200)return;
+    imgs=r.data.records;
+    document.getElementById('thumbs').innerHTML=imgs.map((i,idx)=>{
+        const src=px((i.thumbnails&&i.thumbnails.small)||i.downloadUrl);
+        return`<img class="thumb${idx===0?' active':''}" src="${src}" onclick="show(${idx})" loading="lazy">`;
+    }).join('');
+    show(0);
+}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')show((cur-1+imgs.length)%imgs.length);if(e.key==='ArrowRight')show((cur+1)%imgs.length);});
+init();
+</script>
+</body>
+</html>

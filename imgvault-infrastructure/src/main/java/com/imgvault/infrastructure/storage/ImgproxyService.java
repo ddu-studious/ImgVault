@@ -214,12 +214,17 @@ public class ImgproxyService {
 
     /**
      * 构建签名后的完整 URL
+     * 如果配置了 externalBaseUrl，使用外部域名代理地址
      * 签名算法: HMAC-SHA256(key, salt + path) -> URL-safe Base64
      */
     private String buildSignedUrl(String path) {
         try {
             String signedPath = signPath(keyBytes, saltBytes, path);
-            return imgproxyConfig.getBaseUrl() + signedPath;
+            String baseUrl = imgproxyConfig.getExternalBaseUrl();
+            if (baseUrl == null || baseUrl.isEmpty()) {
+                baseUrl = imgproxyConfig.getBaseUrl();
+            }
+            return baseUrl + signedPath;
         } catch (Exception e) {
             log.error("imgproxy URL 签名失败: path={}", path, e);
             throw new RuntimeException("imgproxy URL 签名失败: " + e.getMessage(), e);

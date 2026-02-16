@@ -343,6 +343,13 @@ Content-Type: xxx (如有)
 
 ## 现有文档清单
 
+### 架构文档 (docs/architecture/)
+- `SYSTEM_ARCHITECTURE_OVERVIEW.md` - 系统架构概览
+- `DATA_MODEL_RELATIONSHIPS.md` - 数据模型关系
+- `STORAGE_ARCHITECTURE.md` - 存储架构
+- `ACCESS_CONTROL_DESIGN.md` - 访问控制与图片可见性设计
+- `QUICK_START.md` - 快速开始
+
 ### 调研文档 (docs/research/)
 - `image-storage-service-research.md` - 图片存储/查询服务技术调研（Java 生态）
 - `image-service-language-comparison-research.md` - 多语言图片服务方案对比调研（Go/Rust/Python/C++）
@@ -350,10 +357,11 @@ Content-Type: xxx (如有)
 ### 需求文档 (docs/requirements/)
 - `v2.0.0-图片存储查询服务.md` - 图片存储查询服务需求文档
 - `v2.1.0-轻量化混合架构重构.md` - 轻量化混合架构重构需求文档
+- `v2.3.0-用户管理端分离与主题支持.md` - 用户管理端分离与主题支持
 
 ### API 文档 (docs/api/)
 - `api-reference.md` - ImgVault API 接口文档（完整版）
 
 ---
 
-**最后更新**: 2026-02-14
+**最后更新**: 2026-02-15
