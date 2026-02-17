@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS img_image (
     has_alpha INTEGER DEFAULT 0,
     uploader_id INTEGER,
     upload_source TEXT,
+    visitor_id TEXT,                  -- 访客唯一标识（UUID）
     status INTEGER DEFAULT 1,        -- 0-删除 1-正常 2-审核中
     access_level INTEGER DEFAULT 0,   -- 0-公开 1-私有 2-受限
     view_count INTEGER DEFAULT 0,
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS img_image (
 CREATE INDEX IF NOT EXISTS idx_image_hash ON img_image(file_hash);
 CREATE INDEX IF NOT EXISTS idx_image_md5 ON img_image(file_md5);
 CREATE INDEX IF NOT EXISTS idx_image_uploader ON img_image(uploader_id);
+CREATE INDEX IF NOT EXISTS idx_image_visitor ON img_image(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_image_status ON img_image(status);
 CREATE INDEX IF NOT EXISTS idx_image_created ON img_image(created_at);
 CREATE INDEX IF NOT EXISTS idx_image_format ON img_image(format);

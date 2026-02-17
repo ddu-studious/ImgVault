@@ -23,12 +23,13 @@ public interface ImageMapper {
     List<ImageEntity> findPage(@Param("format") String format,
                                @Param("status") Integer status,
                                @Param("keyword") String keyword,
+                               @Param("visitorId") String visitorId,
                                @Param("sortBy") String sortBy,
                                @Param("sortOrder") String sortOrder,
                                @Param("offset") int offset,
                                @Param("limit") int limit);
 
-    long count(@Param("format") String format, @Param("status") Integer status, @Param("keyword") String keyword);
+    long count(@Param("format") String format, @Param("status") Integer status, @Param("keyword") String keyword, @Param("visitorId") String visitorId);
 
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 

@@ -19,6 +19,7 @@
         <result column="has_alpha" property="hasAlpha"/>
         <result column="uploader_id" property="uploaderId"/>
         <result column="upload_source" property="uploadSource"/>
+        <result column="visitor_id" property="visitorId"/>
         <result column="status" property="status"/>
         <result column="access_level" property="accessLevel"/>
         <result column="view_count" property="viewCount"/>
@@ -31,18 +32,18 @@
     <sql id="allColumns">
         id, image_uuid, file_hash, file_md5, original_name, storage_path, bucket_name,
         file_size, width, height, format, mime_type, color_space, has_alpha,
-        uploader_id, upload_source, status, access_level, view_count, description,
+        uploader_id, upload_source, visitor_id, status, access_level, view_count, description,
         created_at, updated_at, deleted_at
     </sql>
 
     <insert id="insert" parameterType="com.imgvault.domain.entity.ImageEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO img_image (image_uuid, file_hash, file_md5, original_name, storage_path,
                                bucket_name, file_size, width, height, format, mime_type,
-                               color_space, has_alpha, uploader_id, upload_source,
+                               color_space, has_alpha, uploader_id, upload_source, visitor_id,
                                status, access_level, description)
         VALUES (#{imageUuid}, #{fileHash}, #{fileMd5}, #{originalName}, #{storagePath},
                 #{bucketName}, #{fileSize}, #{width}, #{height}, #{format}, #{mimeType},
-                #{colorSpace}, #{hasAlpha}, #{uploaderId}, #{uploadSource},
+                #{colorSpace}, #{hasAlpha}, #{uploaderId}, #{uploadSource}, #{visitorId},
                 #{status}, #{accessLevel}, #{description})
     </insert>
 
@@ -69,6 +70,9 @@
         SELECT <include refid="allColumns"/>
         FROM img_image
         WHERE status = #{status}
+        <if test="visitorId != null and visitorId != ''">
+            AND visitor_id = #{visitorId}
+        </if>
         <if test="format != null and format != ''">
             AND format = #{format}
         </if>
@@ -95,6 +99,9 @@
         SELECT COUNT(*)
         FROM img_image
         WHERE status = #{status}
+        <if test="visitorId != null and visitorId != ''">
+            AND visitor_id = #{visitorId}
+        </if>
         <if test="format != null and format != ''">
             AND format = #{format}
         </if>

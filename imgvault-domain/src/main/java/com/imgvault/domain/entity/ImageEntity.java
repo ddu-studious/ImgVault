@@ -28,6 +28,7 @@ public class ImageEntity implements Serializable {
     private Integer hasAlpha;
     private Long uploaderId;
     private String uploadSource;
+    private String visitorId;
     private Integer status;          // 0-删除 1-正常 2-审核中
     private Integer accessLevel;     // 0-公开 1-私有 2-受限
     private Long viewCount;

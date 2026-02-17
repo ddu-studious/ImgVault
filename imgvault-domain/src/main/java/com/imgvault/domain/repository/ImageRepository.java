@@ -32,21 +32,22 @@ public interface ImageRepository {
     /**
      * 分页查询图片列表
      *
-     * @param format   格式过滤（可选）
-     * @param status   状态过滤
-     * @param keyword  关键词搜索（文件名模糊匹配，可选）
-     * @param sortBy   排序字段
+     * @param format    格式过滤（可选）
+     * @param status    状态过滤
+     * @param keyword   关键词搜索（文件名模糊匹配，可选）
+     * @param visitorId 访客ID过滤（可选，null 时不过滤）
+     * @param sortBy    排序字段
      * @param sortOrder 排序方向
-     * @param offset   偏移量
-     * @param limit    每页大小
+     * @param offset    偏移量
+     * @param limit     每页大小
      * @return 图片列表
      */
-    List<ImageEntity> findPage(String format, Integer status, String keyword, String sortBy, String sortOrder, int offset, int limit);
+    List<ImageEntity> findPage(String format, Integer status, String keyword, String visitorId, String sortBy, String sortOrder, int offset, int limit);
 
     /**
      * 查询总数
      */
-    long count(String format, Integer status, String keyword);
+    long count(String format, Integer status, String keyword, String visitorId);
 
     /**
      * 更新图片状态（软删除）

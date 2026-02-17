@@ -74,7 +74,7 @@ class ImageControllerTest {
             dto.setFormat("jpeg");
             dto.setFileSize(4L);
 
-            when(imageAppService.uploadImage(any())).thenReturn(dto);
+            when(imageAppService.uploadImage(any(), any())).thenReturn(dto);
 
             // 执行请求
             mockMvc.perform(multipart("/api/v1/images/upload")
@@ -93,7 +93,7 @@ class ImageControllerTest {
                     "file", "malware.exe", "application/octet-stream",
                     new byte[]{0x4D, 0x5A}); // PE executable header
 
-            when(imageAppService.uploadImage(any()))
+            when(imageAppService.uploadImage(any(), any()))
                     .thenThrow(BusinessException.badRequest("不支持的文件类型"));
 
             mockMvc.perform(multipart("/api/v1/images/upload")

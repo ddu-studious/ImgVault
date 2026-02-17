@@ -48,7 +48,7 @@ public class ImageAppService {
     /**
      * F02 + F03 + F08: 图片上传（含安全校验和元数据提取）
      */
-    public ImageUploadDTO uploadImage(MultipartFile file) {
+    public ImageUploadDTO uploadImage(MultipartFile file, String visitorId) {
         // 1. 基本参数校验
         validateUploadFile(file);
 
@@ -132,6 +132,7 @@ public class ImageAppService {
             entity.setHasAlpha(hasAlpha ? 1 : 0);
             entity.setStatus(ImageStatus.NORMAL.getCode());
             entity.setAccessLevel(0);
+            entity.setVisitorId(visitorId);
             imageRepository.insert(entity);
 
             // 8. 保存文件指纹（用于秒传）
@@ -176,11 +177,11 @@ public class ImageAppService {
     /**
      * F02: 批量上传
      */
-    public List<ImageUploadDTO> batchUpload(MultipartFile[] files) {
+    public List<ImageUploadDTO> batchUpload(MultipartFile[] files, String visitorId) {
         List<ImageUploadDTO> results = new ArrayList<>();
         for (MultipartFile file : files) {
             try {
-                results.add(uploadImage(file));
+                results.add(uploadImage(file, visitorId));
             } catch (Exception e) {
                 log.error("批量上传失败: file={}, error={}", file.getOriginalFilename(), e.getMessage());
                 // 继续上传其他文件
@@ -222,14 +223,15 @@ public class ImageAppService {
         Integer status = request.getStatus() != null ? request.getStatus() : ImageStatus.NORMAL.getCode();
         String format = StringUtils.isNotBlank(request.getFormat()) ? request.getFormat() : null;
         String keyword = StringUtils.isNotBlank(request.getKeyword()) ? request.getKeyword() : null;
+        String visitorId = StringUtils.isNotBlank(request.getVisitorId()) ? request.getVisitorId() : null;
 
-        long total = imageRepository.count(format, status, keyword);
+        long total = imageRepository.count(format, status, keyword, visitorId);
         if (total == 0) {
             return PageResult.empty(request.getPage(), request.getSize());
         }
 
         List<ImageEntity> entities = imageRepository.findPage(
-                format, status, keyword,
+                format, status, keyword, visitorId,
                 request.getSortBy(), request.getSortOrder(),
                 request.getOffset(), request.getSize());
 

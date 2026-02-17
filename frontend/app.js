@@ -6,6 +6,30 @@
 // ==================== 配置 ====================
 const BASE = '/imgvault/api/v1';
 const PAGE_SIZE = 24;
+const VISITOR_ID_KEY = 'imgvault_visitor_id';
+
+/**
+ * 获取访客唯一标识
+ * 首次访问时生成 UUID 并存储到 localStorage
+ * 隐私模式下降级到 sessionStorage
+ */
+function getVisitorId() {
+    try {
+        let id = localStorage.getItem(VISITOR_ID_KEY);
+        if (!id) {
+            id = crypto.randomUUID();
+            localStorage.setItem(VISITOR_ID_KEY, id);
+        }
+        return id;
+    } catch (e) {
+        let id = sessionStorage.getItem(VISITOR_ID_KEY);
+        if (!id) {
+            id = crypto.randomUUID();
+            sessionStorage.setItem(VISITOR_ID_KEY, id);
+        }
+        return id;
+    }
+}
 
 /**
  * 处理图片 URL
@@ -81,7 +105,11 @@ async function api(path, opts = {}) {
     const url = BASE + path;
     try {
         const resp = await fetch(url, {
-            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Visitor-Id': getVisitorId(),
+                ...opts.headers,
+            },
             ...opts,
         });
         if (opts.raw) return resp;
@@ -541,6 +569,7 @@ async function handleFiles(files) {
             const result = await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', BASE + '/images/upload');
+                xhr.setRequestHeader('X-Visitor-Id', getVisitorId());
                 xhr.upload.onprogress = (e) => {
                     if (e.lengthComputable) {
                         const pct = Math.round((e.loaded / e.total) * 100);

@@ -33,8 +33,9 @@ public class ImageController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "上传图片", description = "支持 JPEG/PNG/GIF/WebP/BMP 格式，最大 50MB")
     public Result<ImageUploadDTO> upload(
-            @Parameter(description = "图片文件") @RequestParam("file") MultipartFile file) {
-        return Result.success("上传成功", imageAppService.uploadImage(file));
+            @Parameter(description = "图片文件") @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "X-Visitor-Id", required = false) String visitorId) {
+        return Result.success("上传成功", imageAppService.uploadImage(file, visitorId));
     }
 
     /**
@@ -43,8 +44,9 @@ public class ImageController {
     @PostMapping(value = "/batch-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "批量上传图片", description = "支持同时上传多张图片")
     public Result<List<ImageUploadDTO>> batchUpload(
-            @Parameter(description = "图片文件列表") @RequestParam("files") MultipartFile[] files) {
-        return Result.success("批量上传完成", imageAppService.batchUpload(files));
+            @Parameter(description = "图片文件列表") @RequestParam("files") MultipartFile[] files,
+            @RequestHeader(value = "X-Visitor-Id", required = false) String visitorId) {
+        return Result.success("批量上传完成", imageAppService.batchUpload(files, visitorId));
     }
 
     /**
@@ -72,7 +74,10 @@ public class ImageController {
      */
     @GetMapping
     @Operation(summary = "分页查询图片列表", description = "支持按格式/时间/大小排序筛选")
-    public Result<PageResult<ImageDetailDTO>> list(@Valid ImageQueryRequest request) {
+    public Result<PageResult<ImageDetailDTO>> list(
+            @Valid ImageQueryRequest request,
+            @RequestHeader(value = "X-Visitor-Id", required = false) String visitorId) {
+        request.setVisitorId(visitorId);
         return Result.success(imageAppService.listImages(request));
     }
 

@@ -20,4 +20,7 @@ public class ImageQueryRequest extends PageQuery {
 
     @Schema(description = "关键词搜索（文件名模糊匹配）", example = "sunset")
     private String keyword;
+
+    @Schema(description = "访客ID（前端自动传递，无需手动设置）", hidden = true)
+    private String visitorId;
 }

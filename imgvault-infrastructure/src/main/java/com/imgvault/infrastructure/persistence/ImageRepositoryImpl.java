@@ -38,13 +38,13 @@ public class ImageRepositoryImpl implements ImageRepository {
     }
 
     @Override
-    public List<ImageEntity> findPage(String format, Integer status, String keyword, String sortBy, String sortOrder, int offset, int limit) {
-        return imageMapper.findPage(format, status, keyword, sortBy, sortOrder, offset, limit);
+    public List<ImageEntity> findPage(String format, Integer status, String keyword, String visitorId, String sortBy, String sortOrder, int offset, int limit) {
+        return imageMapper.findPage(format, status, keyword, visitorId, sortBy, sortOrder, offset, limit);
     }
 
     @Override
-    public long count(String format, Integer status, String keyword) {
-        return imageMapper.count(format, status, keyword);
+    public long count(String format, Integer status, String keyword, String visitorId) {
+        return imageMapper.count(format, status, keyword, visitorId);
     }
 
     @Override
