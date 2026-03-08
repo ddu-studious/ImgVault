@@ -166,22 +166,187 @@ async function batchDeleteImages() {
 async function viewImage(id) {
     const res = await api(`/images/${id}`);
     if (!res || res.code!==200) { toast('加载失败','error'); return; }
-    const img = res.data, url = proxyImageUrl(img.downloadUrl);
+    const img = res.data;
+    const originalUrl = proxyImageUrl(img.downloadUrl);
+    const thumbSmall = img.thumbnails?.small ? proxyImageUrl(img.thumbnails.small) : null;
+    const thumbMedium = img.thumbnails?.medium ? proxyImageUrl(img.thumbnails.medium) : null;
+    const thumbLarge = img.thumbnails?.large ? proxyImageUrl(img.thumbnails.large) : null;
+
     let tagHtml = '';
     try { const tr = await api(`/tags/images/${id}/tags`); if(tr?.code===200) tagHtml = (tr.data||[]).map(t=>`<span class="status status-normal">${t.name}</span>`).join(' '); } catch(e){}
+
+    const sizePresets = buildAdminSizePresets(img.width, img.height);
+    const formatOptions = buildAdminFormatOptions(img.format);
+
     document.getElementById('modalTitle').textContent = '图片详情';
     document.getElementById('modalBody').innerHTML = `
-        ${url?`<img class="detail-img" src="${url}">`:''}
-        <div class="detail-grid">
-            <div class="lbl">文件名</div><div class="val">${img.originalName||'-'}</div>
-            <div class="lbl">格式</div><div class="val">${(img.format||'-').toUpperCase()}</div>
-            <div class="lbl">尺寸</div><div class="val">${img.width&&img.height?img.width+'×'+img.height:'-'}</div>
-            <div class="lbl">大小</div><div class="val">${fmtSize(img.fileSize)}</div>
-            <div class="lbl">UUID</div><div class="val">${img.imageUuid||'-'}</div>
-            <div class="lbl">创建时间</div><div class="val">${img.createdAt||'-'}</div>
-            <div class="lbl">标签</div><div class="val">${tagHtml||'<span style="color:var(--muted)">无</span>'}</div>
+        <div class="admin-detail-layout">
+            <div class="admin-detail-preview">
+                <div class="admin-preview-main" id="adminPreviewMain">
+                    ${originalUrl ? `<img id="adminPreviewImg" class="admin-preview-img" src="${thumbLarge || thumbMedium || originalUrl}" alt="${img.originalName||''}" onclick="adminToggleZoom(this)">` : '<div style="padding:40px;color:var(--muted);text-align:center">无法加载图片</div>'}
+                </div>
+                <div class="admin-preview-sizes">
+                    <span class="admin-size-label">查看尺寸:</span>
+                    ${thumbSmall ? `<button class="admin-size-btn" onclick="adminSwitchPreview('${thumbSmall}', this)" title="小图 150×150">S</button>` : ''}
+                    ${thumbMedium ? `<button class="admin-size-btn" onclick="adminSwitchPreview('${thumbMedium}', this)" title="中图 800×600">M</button>` : ''}
+                    ${thumbLarge ? `<button class="admin-size-btn active" onclick="adminSwitchPreview('${thumbLarge}', this)" title="大图 1920×1080">L</button>` : ''}
+                    <button class="admin-size-btn${!thumbLarge ? ' active' : ''}" onclick="adminSwitchPreview('${originalUrl}', this)" title="原图 ${img.width||'?'}×${img.height||'?'}">原图</button>
+                    <button class="admin-size-btn" onclick="adminOpenFullscreen('${originalUrl}')" title="全屏查看">⛶</button>
+                </div>
+            </div>
+            <div class="admin-detail-info">
+                <div class="admin-info-section">
+                    <h4>文件信息</h4>
+                    <div class="detail-grid">
+                        <div class="lbl">文件名</div><div class="val" title="${img.originalName||''}">${img.originalName||'-'}</div>
+                        <div class="lbl">格式</div><div class="val">${(img.format||'-').toUpperCase()}</div>
+                        <div class="lbl">尺寸</div><div class="val">${img.width&&img.height?img.width+'×'+img.height:'-'}</div>
+                        <div class="lbl">大小</div><div class="val">${fmtSize(img.fileSize)}</div>
+                        <div class="lbl">MIME</div><div class="val">${img.mimeType||'-'}</div>
+                        <div class="lbl">UUID</div><div class="val" style="font-size:11px;word-break:break-all">${img.imageUuid||'-'}</div>
+                        <div class="lbl">创建时间</div><div class="val">${img.createdAt||'-'}</div>
+                        <div class="lbl">标签</div><div class="val">${tagHtml||'<span style="color:var(--muted)">无</span>'}</div>
+                    </div>
+                </div>
+                <div class="admin-info-section">
+                    <h4>多规格下载</h4>
+                    <div class="admin-dl-group">
+                        <div class="admin-dl-label">尺寸</div>
+                        <div class="admin-dl-chips" id="adminDlSizeChips">
+                            ${sizePresets.map((p, i) => `<span class="admin-dl-chip${i===0?' active':''}" data-w="${p.w}" data-h="${p.h}" onclick="adminSelectDlChip(this)">${p.label}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="admin-dl-group">
+                        <div class="admin-dl-label">格式</div>
+                        <div class="admin-dl-chips" id="adminDlFmtChips">
+                            ${formatOptions.map((f, i) => `<span class="admin-dl-chip${i===0?' active':''}" data-fmt="${f.value}" onclick="adminSelectDlChip(this)">${f.label}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="admin-dl-group">
+                        <div class="admin-dl-label">自定义</div>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <input type="number" id="adminDlW" placeholder="宽" style="width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px" min="1" max="10000">
+                            <span style="color:var(--muted)">×</span>
+                            <input type="number" id="adminDlH" placeholder="高" style="width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px" min="1" max="10000">
+                            <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px" onclick="adminApplyCustomSize()">应用</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:10px">
+                        <button class="btn btn-primary btn-sm" onclick="adminDoDownload(${img.id}, '${(img.originalName||'image').replace(/'/g,"\\'")}')">⬇ 下载</button>
+                        <button class="btn btn-outline btn-sm" onclick="adminCopyLink(${img.id})">🔗 复制链接</button>
+                        <a class="btn btn-outline btn-sm" href="${originalUrl}" target="_blank" download>⬇ 原图</a>
+                    </div>
+                </div>
+            </div>
         </div>`;
     openModal();
+}
+
+function buildAdminSizePresets(origW, origH) {
+    const presets = [{ label: '原始', w: 0, h: 0 }];
+    const sizes = [
+        { label: '大 1920', w: 1920, h: 1080 },
+        { label: '中 1280', w: 1280, h: 720 },
+        { label: '小 800', w: 800, h: 600 },
+        { label: '缩略 400', w: 400, h: 300 },
+        { label: '图标 150', w: 150, h: 150 },
+    ];
+    for (const s of sizes) {
+        if (origW && origH && (s.w < origW || s.h < origH)) presets.push(s);
+    }
+    if (presets.length === 1 && origW && origH) {
+        presets.push({ label: '中 1280', w: 1280, h: 720 });
+        presets.push({ label: '小 800', w: 800, h: 600 });
+    }
+    return presets;
+}
+function buildAdminFormatOptions(originalFormat) {
+    const fmt = (originalFormat||'').toLowerCase();
+    const opts = [{ label: '原格式', value: '' }];
+    for (const f of [{ label: 'JPEG', value: 'jpeg' },{ label: 'PNG', value: 'png' },{ label: 'WebP', value: 'webp' },{ label: 'AVIF', value: 'avif' }]) {
+        if (f.value !== fmt) opts.push(f);
+    }
+    return opts;
+}
+function adminSelectDlChip(el) {
+    el.closest('.admin-dl-chips').querySelectorAll('.admin-dl-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+}
+function adminApplyCustomSize() {
+    const w = parseInt(document.getElementById('adminDlW')?.value) || 0;
+    const h = parseInt(document.getElementById('adminDlH')?.value) || 0;
+    if (w<=0 && h<=0) { toast('请输入有效的宽高','error'); return; }
+    const chips = document.getElementById('adminDlSizeChips');
+    chips.querySelectorAll('.admin-dl-chip').forEach(c => c.classList.remove('active'));
+    let custom = chips.querySelector('[data-custom]');
+    if (!custom) { custom = document.createElement('span'); custom.className='admin-dl-chip active'; custom.dataset.custom='1'; custom.onclick=function(){adminSelectDlChip(this)}; chips.appendChild(custom); }
+    custom.className='admin-dl-chip active'; custom.dataset.w=w; custom.dataset.h=h;
+    custom.textContent=`${w||'auto'}×${h||'auto'}`;
+    toast('已应用自定义尺寸','success');
+}
+function adminGetDlParams() {
+    const sc = document.querySelector('#adminDlSizeChips .admin-dl-chip.active');
+    const fc = document.querySelector('#adminDlFmtChips .admin-dl-chip.active');
+    return { width: sc ? parseInt(sc.dataset.w)||0 : 0, height: sc ? parseInt(sc.dataset.h)||0 : 0, format: fc ? fc.dataset.fmt||'' : '', quality: 85 };
+}
+async function adminDoDownload(imageId, originalName) {
+    const p = adminGetDlParams();
+    if (p.width===0 && p.height===0 && !p.format) {
+        const res = await api(`/images/${imageId}`);
+        if (res?.code===200) { const a=document.createElement('a'); a.href=proxyImageUrl(res.data.downloadUrl); a.download=originalName; a.click(); }
+        return;
+    }
+    const qs = new URLSearchParams();
+    if (p.width>0) qs.set('width',p.width);
+    if (p.height>0) qs.set('height',p.height);
+    if (p.format) qs.set('format',p.format);
+    if (p.quality>0) qs.set('quality',p.quality);
+    const res = await api(`/images/${imageId}/process-url?${qs.toString()}`);
+    if (res?.code===200 && res.data) {
+        const url = proxyImageUrl(res.data);
+        const ext = p.format || originalName.split('.').pop() || 'jpg';
+        const base = originalName.replace(/\.[^.]+$/,'');
+        const suffix = (p.width||p.height) ? `_${p.width||'auto'}x${p.height||'auto'}` : '';
+        const a=document.createElement('a'); a.href=url; a.download=`${base}${suffix}.${ext}`; a.target='_blank'; a.click();
+        toast('开始下载','success');
+    } else { toast('获取处理链接失败','error'); }
+}
+async function adminCopyLink(imageId) {
+    const p = adminGetDlParams();
+    if (p.width===0 && p.height===0 && !p.format) {
+        const res = await api(`/images/${imageId}`);
+        if (res?.code===200) { const u=proxyImageUrl(res.data.downloadUrl); const full=u.startsWith('http')?u:location.origin+u; navigator.clipboard.writeText(full).then(()=>toast('链接已复制','success')).catch(()=>toast('复制失败','error')); }
+        return;
+    }
+    const qs = new URLSearchParams();
+    if (p.width>0) qs.set('width',p.width);
+    if (p.height>0) qs.set('height',p.height);
+    if (p.format) qs.set('format',p.format);
+    if (p.quality>0) qs.set('quality',p.quality);
+    const res = await api(`/images/${imageId}/process-url?${qs.toString()}`);
+    if (res?.code===200 && res.data) {
+        const u=proxyImageUrl(res.data); const full=u.startsWith('http')?u:location.origin+u;
+        navigator.clipboard.writeText(full).then(()=>toast('链接已复制','success')).catch(()=>toast('复制失败','error'));
+    } else { toast('获取处理链接失败','error'); }
+}
+function adminSwitchPreview(url, btn) {
+    const img = document.getElementById('adminPreviewImg');
+    if (img) { img.src = url; img.classList.remove('zoomed'); }
+    btn.closest('.admin-preview-sizes').querySelectorAll('.admin-size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+function adminToggleZoom(img) {
+    img.classList.toggle('zoomed');
+}
+function adminOpenFullscreen(url) {
+    const overlay = document.createElement('div');
+    overlay.className = 'admin-fullscreen-overlay';
+    overlay.innerHTML = `
+        <div class="admin-fullscreen-close" onclick="this.parentElement.remove()">✕</div>
+        <img src="${url}" class="admin-fullscreen-img" onclick="event.stopPropagation()">
+    `;
+    overlay.addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
 }
 
 // ==================== Trash ====================
