@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>合成编辑器 - ImgVault</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+    <style>
+        /* Compose editor overrides */
+        .compose-layout {
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 52px);
+        }
+        .compose-main {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        .compose-toolbar {
+            width: 56px;
+            background: var(--surface);
+            border-right: 1px solid var(--border-light);
+            padding: 12px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .compose-toolbar .btn-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 8px;
+            border-radius: 10px;
+        }
+        .compose-toolbar .btn-icon:hover {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+        .compose-toolbar-sep {
+            height: 1px;
+            background: var(--border-light);
+            margin: 8px 12px;
+        }
+        .compose-toolbar select {
+            margin: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            background: var(--surface);
+            color: var(--text);
+            width: calc(100% - 16px);
+            cursor: pointer;
+        }
+        .compose-toolbar select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .compose-canvas-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: var(--bg);
+            overflow: auto;
+        }
+        .compose-canvas-container {
+            position: relative;
+            box-shadow: var(--shadow-xl);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .compose-canvas-container canvas {
+            display: block;
+        }
+        .compose-zoom-bar {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            background: var(--surface);
+            padding: 6px 10px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            z-index: 10;
+        }
+        .compose-zoom-bar button {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .compose-zoom-bar button:hover {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+        .compose-zoom-bar span {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 36px;
+            text-align: center;
+        }
+        .compose-sidebar {
+            width: 260px;
+            background: var(--surface);
+            border-left: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .compose-sidebar-panel {
+            border-bottom: 1px solid var(--border-light);
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .compose-sidebar-panel:last-child {
+            border-bottom: none;
+        }
+        .compose-panel-header {
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-light);
+            flex-shrink: 0;
+        }
+        .compose-panel-body {
+            padding: 12px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .compose-layer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .compose-layer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: var(--bg);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid transparent;
+        }
+        .compose-layer-item:hover {
+            background: var(--accent-light);
+        }
+        .compose-layer-item.selected {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .compose-layer-item .layer-icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+        .compose-layer-item .layer-name {
+            flex: 1;
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .compose-layer-item .layer-actions {
+            display: flex;
+            gap: 2px;
+        }
+        .compose-layer-item .layer-actions button {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: none;
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .compose-layer-item .layer-actions button:hover {
+            background: var(--danger-light);
+            color: var(--danger);
+        }
+        .compose-props-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .compose-prop-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .compose-prop-row label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 48px;
+        }
+        .compose-prop-row input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .compose-prop-row input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .compose-bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 24px;
+            background: var(--surface);
+            border-top: 1px solid var(--border-light);
+            flex-shrink: 0;
+        }
+        .compose-size-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .compose-size-inputs input {
+            width: 72px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .compose-size-inputs input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .compose-bottom-bar .color-picker-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .compose-bottom-bar .color-picker-wrap input[type="color"] {
+            width: 32px;
+            height: 28px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2px;
+            cursor: pointer;
+            background: var(--surface);
+        }
+        .compose-bottom-bar .color-picker-wrap span {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .compose-bottom-bar .spacer {
+            flex: 1;
+        }
+        .compose-empty-props {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 20px;
+            text-align: center;
+        }
+        .compose-empty-layers {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 20px;
+            text-align: center;
+        }
+        /* Image picker modal */
+        .compose-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .compose-modal-overlay.active {
+            display: flex;
+        }
+        .compose-modal {
+            background: var(--surface);
+            border-radius: 18px;
+            width: 640px;
+            max-width: 92vw;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+        }
+        .compose-modal-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .compose-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .compose-modal-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .compose-modal-close:hover {
+            background: var(--border-light);
+        }
+        .compose-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .compose-image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 12px;
+        }
+        .compose-image-item {
+            aspect-ratio: 1;
+            border-radius: var(--radius);
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: var(--transition);
+            background: var(--bg);
+        }
+        .compose-image-item:hover {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .compose-image-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .compose-undo-bar {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+        .compose-undo-bar .btn {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        [data-theme="dark"] .compose-modal {
+            box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <a class="logo" href="/">
+            <div class="logo-icon">V</div>
+            ImgVault
+        </a>
+        <span style="font-size: 16px; font-weight: 600; color: var(--text);">合成编辑器</span>
+        <div class="header-actions">
+            <button class="btn-icon theme-toggle" onclick="toggleTheme()" id="themeToggle" title="跟随系统">💻</button>
+            <a class="btn btn-outline btn-sm" href="/">← 返回首页</a>
+        </div>
+    </div>
+
+    <!-- Compose Layout -->
+    <div class="compose-layout">
+        <div class="compose-main">
+            <!-- Left Toolbar -->
+            <div class="compose-toolbar">
+                <button class="btn-icon" onclick="openImagePicker()" title="添加图片">🖼</button>
+                <button class="btn-icon" onclick="addText()" title="添加文字">T</button>
+                <button class="btn-icon" onclick="addShape('rect')" title="添加矩形">▢</button>
+                <button class="btn-icon" onclick="addShape('circle')" title="添加圆形">○</button>
+                <div class="compose-toolbar-sep"></div>
+                <select id="templateSelect" onchange="onTemplateSelect()">
+                    <option value="">选择模板</option>
+                </select>
+            </div>
+
+            <!-- Center Canvas -->
+            <div class="compose-canvas-wrap">
+                <div class="compose-canvas-container" id="canvasContainer">
+                    <canvas id="fabricCanvas"></canvas>
+                    <div class="compose-zoom-bar" id="zoomBar">
+                        <button onclick="zoomOut()" title="缩小">−</button>
+                        <span id="zoomText">100%</span>
+                        <button onclick="zoomIn()" title="放大">+</button>
+                        <button onclick="zoomFit()" title="适应屏幕">⊡</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="compose-sidebar">
+                <div class="compose-sidebar-panel">
+                    <div class="compose-panel-header">图层</div>
+                    <div class="compose-panel-body">
+                        <div class="compose-layer-list" id="layerList">
+                            <div class="compose-empty-layers" id="emptyLayers">暂无图层</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="compose-sidebar-panel">
+                    <div class="compose-panel-header">属性</div>
+                    <div class="compose-panel-body">
+                        <div id="propsPanel" class="compose-props-form" style="display: none;">
+                            <div class="compose-prop-row">
+                                <label>X</label>
+                                <input type="number" id="propX" onchange="updateProp('left')">
+                            </div>
+                            <div class="compose-prop-row">
+                                <label>Y</label>
+                                <input type="number" id="propY" onchange="updateProp('top')">
+                            </div>
+                            <div class="compose-prop-row">
+                                <label>宽</label>
+                                <input type="number" id="propW" min="1" onchange="updateProp('width')">
+                            </div>
+                            <div class="compose-prop-row">
+                                <label>高</label>
+                                <input type="number" id="propH" min="1" onchange="updateProp('height')">
+                            </div>
+                            <div class="compose-prop-row">
+                                <label>旋转</label>
+                                <input type="number" id="propRot" onchange="updateProp('angle')">
+                            </div>
+                            <div class="compose-prop-row">
+                                <label>透明度</label>
+                                <input type="number" id="propOpacity" min="0" max="100" step="1" onchange="updateProp('opacity')">
+                            </div>
+                        </div>
+                        <div class="compose-empty-props" id="emptyProps">选择元素以编辑属性</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar -->
+        <div class="compose-bottom-bar">
+            <div class="compose-size-inputs">
+                <input type="number" id="canvasW" value="800" min="1" max="4096" onchange="resizeCanvas()">
+                <span>×</span>
+                <input type="number" id="canvasH" value="600" min="1" max="4096" onchange="resizeCanvas()">
+            </div>
+            <div class="color-picker-wrap">
+                <input type="color" id="canvasBg" value="#FFFFFF" onchange="updateCanvasBg()">
+                <span>背景色</span>
+            </div>
+            <div class="spacer"></div>
+            <div class="compose-undo-bar">
+                <button class="btn btn-outline btn-sm" onclick="undo()" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+                <button class="btn btn-outline btn-sm" onclick="redo()" title="重做 (Ctrl+Shift+Z)">↷ 重做</button>
+            </div>
+            <button class="btn btn-primary" onclick="generate()" id="generateBtn">生成图片</button>
+        </div>
+    </div>
+
+    <!-- Image Picker Modal -->
+    <div class="compose-modal-overlay" id="imagePickerModal" onclick="if(event.target===this)closeImagePicker()">
+        <div class="compose-modal">
+            <div class="compose-modal-header">
+                <div class="compose-modal-title">选择图片</div>
+                <button class="compose-modal-close" onclick="closeImagePicker()">&times;</button>
+            </div>
+            <div class="compose-modal-body">
+                <div class="compose-image-grid" id="imagePickerGrid">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="compose.js"></script>
+</body>
+</html>

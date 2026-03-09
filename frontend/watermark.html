@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>去水印工具 - ImgVault</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+    <style>
+        /* Watermark tool specific styles */
+        .watermark-layout {
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 52px);
+        }
+        .watermark-main {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        .watermark-toolbar {
+            width: 200px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border-light);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .watermark-toolbar-section {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        .watermark-toolbar .btn {
+            justify-content: flex-start;
+            width: 100%;
+        }
+        .watermark-toolbar .btn.active {
+            background: var(--accent-light);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        .watermark-toolbar .btn.active.btn-outline {
+            background: var(--accent-light);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        .watermark-toolbar .btn.btn-outline.btn-danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .watermark-toolbar .btn.btn-outline.btn-danger:hover {
+            background: var(--danger-light);
+        }
+        .watermark-canvas-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: var(--bg);
+            overflow: auto;
+        }
+        .watermark-canvas-wrap canvas {
+            box-shadow: var(--shadow-lg);
+            border-radius: var(--radius);
+        }
+        .watermark-sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-left: 1px solid var(--border-light);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .watermark-sidebar-section {
+            background: var(--bg);
+            border-radius: var(--radius);
+            padding: 14px;
+            border: 1px solid var(--border-light);
+        }
+        .watermark-sidebar-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .watermark-engine-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .watermark-engine-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .watermark-engine-option:hover {
+            border-color: var(--border);
+        }
+        .watermark-engine-option.selected {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .watermark-engine-option input {
+            margin: 0;
+        }
+        .watermark-engine-option label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .watermark-preview {
+            display: flex;
+            gap: 8px;
+            min-height: 120px;
+        }
+        .watermark-preview-item {
+            flex: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg);
+            border: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+        }
+        .watermark-preview-item img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .watermark-preview-item .placeholder {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .watermark-preview-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-align: center;
+        }
+        .watermark-bottom-bar {
+            height: 56px;
+            background: var(--surface);
+            border-top: 1px solid var(--border-light);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .watermark-brush-slider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .watermark-brush-slider input[type="range"] {
+            width: 100px;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-light);
+            border-radius: 3px;
+        }
+        .watermark-brush-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        .watermark-brush-slider span {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 32px;
+        }
+        .watermark-header-back {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: var(--transition);
+        }
+        .watermark-header-back:hover {
+            color: var(--accent);
+        }
+        .watermark-header-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        [data-theme="dark"] .watermark-toolbar,
+        [data-theme="dark"] .watermark-sidebar {
+            background: var(--surface);
+            border-color: var(--border);
+        }
+        [data-theme="dark"] .watermark-canvas-wrap {
+            background: var(--bg);
+        }
+        [data-theme="dark"] .watermark-bottom-bar {
+            background: var(--surface);
+            border-color: var(--border);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <a class="logo" href="/">
+            <div class="logo-icon">V</div>
+            ImgVault
+        </a>
+        <div class="watermark-header-title">去水印工具</div>
+        <div class="header-actions">
+            <a class="watermark-header-back" href="/">← 返回首页</a>
+            <button class="btn-icon theme-toggle" onclick="toggleTheme()" id="themeToggle" title="跟随系统">💻</button>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="watermark-layout">
+        <div class="watermark-main">
+            <!-- Left Toolbar -->
+            <div class="watermark-toolbar">
+                <div class="watermark-toolbar-section">图片来源</div>
+                <button class="btn btn-outline" id="btnUpload">
+                    📤 上传图片
+                </button>
+                <button class="btn btn-outline" id="btnSelectLibrary">
+                    📁 从图库选择
+                </button>
+                <input type="file" id="fileInput" accept="image/*" style="display:none">
+
+                <div class="watermark-toolbar-section" style="margin-top:16px">标记工具</div>
+                <button class="btn btn-outline" id="btnBrush" title="画笔">
+                    🖌 画笔
+                </button>
+                <button class="btn btn-outline" id="btnRect" title="矩形">
+                    ▭ 矩形
+                </button>
+                <button class="btn btn-outline" id="btnEraser" title="橡皮擦">
+                    🧹 橡皮擦
+                </button>
+                <button class="btn btn-outline btn-danger" id="btnClearMask" title="清除全部">
+                    🗑 清除标记
+                </button>
+
+                <div class="watermark-brush-slider" style="margin-top:12px">
+                    <span id="brushSizeLabel">20px</span>
+                    <input type="range" id="brushSizeSlider" min="5" max="50" value="20">
+                </div>
+            </div>
+
+            <!-- Center Canvas -->
+            <div class="watermark-canvas-wrap">
+                <canvas id="watermarkCanvas"></canvas>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="watermark-sidebar">
+                <div class="watermark-sidebar-section">
+                    <div class="watermark-sidebar-title">处理引擎</div>
+                    <div class="watermark-engine-options">
+                        <label class="watermark-engine-option selected" data-engine="opencv">
+                            <input type="radio" name="engine" value="opencv" checked>
+                            <span>OpenCV 快速</span>
+                        </label>
+                        <label class="watermark-engine-option" data-engine="iopaint">
+                            <input type="radio" name="engine" value="iopaint">
+                            <span>IOPaint AI 高质量</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="watermark-sidebar-section">
+                    <div class="watermark-sidebar-title">预览</div>
+                    <div class="watermark-preview">
+                        <div>
+                            <div class="watermark-preview-item" id="previewBefore">
+                                <span class="placeholder">原图</span>
+                            </div>
+                            <div class="watermark-preview-label">处理前</div>
+                        </div>
+                        <div>
+                            <div class="watermark-preview-item" id="previewAfter">
+                                <span class="placeholder">结果</span>
+                            </div>
+                            <div class="watermark-preview-label">处理后</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar -->
+        <div class="watermark-bottom-bar">
+            <button class="btn btn-primary" id="btnRemove" disabled>
+                去除水印
+            </button>
+            <button class="btn btn-outline" id="btnDownload" disabled>
+                ⬇ 下载结果
+            </button>
+        </div>
+    </div>
+
+    <!-- Image Picker Modal -->
+    <div class="modal-overlay" id="imagePickerModal" onclick="if(event.target===this)closeImagePicker()">
+        <div class="modal" style="width:700px;max-height:80vh">
+            <div class="modal-header">
+                <div class="modal-title">从图库选择图片</div>
+                <button class="modal-close" onclick="closeImagePicker()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="loading" id="imagePickerLoading"><div class="spinner"></div></div>
+                <div class="grid" id="imagePickerGrid" style="display:none;columns:4 140px;column-gap:10px"></div>
+                <div class="pagination" id="imagePickerPagination" style="margin-top:16px;display:none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="watermark.js"></script>
+</body>
+</html>

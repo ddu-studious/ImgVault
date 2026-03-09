@@ -96,6 +96,10 @@ admin:
     secret: ${JWT_SECRET:imgvault-jwt-secret-key-2026-hmac-sha256}
     expire-hours: 24
 
+# IOPaint AI 去水印配置
+iopaint:
+  base-url: ${IOPAINT_URL:http://localhost:8085}
+
 # 应用自定义配置
 imgvault:
   storage:

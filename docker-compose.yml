@@ -69,6 +69,31 @@ services:
         reservations:
           memory: 128M
 
+  # ==========================================
+  # AI 去水印: IOPaint (LaMa-Cleaner)
+  # ==========================================
+  iopaint:
+    image: cwq1913/iopaint:latest
+    container_name: imgvault-iopaint
+    ports:
+      - "8085:8080"
+    environment:
+      - DEFAULT_MODEL=lama
+      - DEVICE=cpu
+    volumes:
+      - iopaint-data:/app/models
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    profiles:
+      - iopaint
+
 volumes:
   minio-data:
+    driver: local
+  iopaint-data:
     driver: local

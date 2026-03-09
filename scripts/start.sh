@@ -27,24 +27,28 @@ cd "$SCRIPT_DIR"
 
 SKIP_BUILD=false
 API_ONLY=false
+WITH_IOPAINT=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-build) SKIP_BUILD=true; shift ;;
-        --api-only)   API_ONLY=true; shift ;;
+        --skip-build)   SKIP_BUILD=true; shift ;;
+        --api-only)     API_ONLY=true; shift ;;
+        --with-iopaint) WITH_IOPAINT=true; shift ;;
         --help|-h)
-            echo "ImgVault v2.1.0 一键启动脚本"
+            echo "ImgVault v2.5.0 一键启动脚本"
             echo ""
             echo "用法: ./start.sh [选项]"
             echo ""
             echo "选项:"
-            echo "  --skip-build   跳过 Maven 编译，直接启动"
-            echo "  --api-only     仅启动 API 服务 (不启动 Admin)"
-            echo "  --help         显示此帮助信息"
+            echo "  --skip-build     跳过 Maven 编译，直接启动"
+            echo "  --api-only       仅启动 API 服务 (不启动 Admin)"
+            echo "  --with-iopaint   同时启动 IOPaint AI 去水印服务 (端口 8085)"
+            echo "  --help           显示此帮助信息"
             echo ""
             echo "说明:"
             echo "  首次运行会自动检查并安装 Docker (仅 Linux)"
             echo "  启动顺序: Docker(MinIO+imgproxy) → Maven 编译 → API(8080) → Admin(8082)"
+            echo "  IOPaint 为可选服务，首次启动需下载模型 (~200MB)，建议有 GPU 环境时使用"
             exit 0
             ;;
         *) log_error "未知选项: $1"; exit 1 ;;
@@ -52,7 +56,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "=========================================="
-echo "  ImgVault v2.1.0 启动"
+echo "  ImgVault v2.5.0 启动"
 echo "=========================================="
 echo ""
 
@@ -167,7 +171,12 @@ fi
 # 6. 启动 Docker 服务 (MinIO + imgproxy)
 # ==========================================
 log_info "启动 Docker 服务 (MinIO + imgproxy)..."
-docker compose up -d
+if [ "$WITH_IOPAINT" = true ]; then
+    log_info "同时启动 IOPaint AI 去水印服务..."
+    docker compose --profile iopaint up -d
+else
+    docker compose up -d
+fi
 
 # 等待 MinIO 就绪
 log_info "等待 MinIO 启动..."
@@ -284,20 +293,27 @@ fi
 
 echo ""
 echo "=========================================="
-log_info "ImgVault v2.1.0 已启动"
+log_info "ImgVault v2.5.0 已启动"
 echo "=========================================="
 echo ""
 echo "  服务地址:"
-echo "    API:       http://localhost:8080"
-echo "    Admin:     http://localhost:8082"
-echo "    Swagger:   http://localhost:8080/swagger-ui.html"
-echo "    Health:    http://localhost:8080/actuator/health"
+echo "    API:          http://localhost:8080"
+echo "    Admin:        http://localhost:8082"
+echo "    Swagger:      http://localhost:8080/swagger-ui.html"
+echo "    Health:       http://localhost:8080/actuator/health"
+echo "    合成编辑器:   http://localhost:8080/compose.html"
+echo "    去水印工具:   http://localhost:8080/watermark.html"
 echo ""
 echo "  基础设施:"
-echo "    imgproxy:  http://localhost:8081"
-echo "    MinIO:     http://localhost:9001  (admin/minioadmin)"
+echo "    imgproxy:     http://localhost:8081"
+echo "    MinIO:        http://localhost:9001  (admin/minioadmin)"
+if [ "$WITH_IOPAINT" = true ]; then
+echo "    IOPaint:      http://localhost:8085  (AI 去水印)"
+fi
 echo ""
 echo "  管理后台密码: imgvault-admin (可在 application.yml 修改)"
 echo ""
-echo "  停止服务: ./stop.sh"
+echo "  提示:"
+echo "    停止服务:         ./stop.sh"
+echo "    单独启动 IOPaint: ./iopaint.sh start"
 echo ""

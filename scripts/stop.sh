@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==========================================
-# ImgVault v2.1.0 停止脚本
+# ImgVault v2.5.0 停止脚本
 # ==========================================
 # 用法:
 #   ./stop.sh              # 停止所有服务
@@ -42,11 +42,12 @@ if [ -f data/imgvault-api.pid ]; then
     rm -f data/imgvault-api.pid
 fi
 
-# 停止 Docker 服务
+# 停止 Docker 服务 (含 IOPaint)
 if [ "$KEEP_DOCKER" = false ]; then
     if command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
+        docker compose --profile iopaint down 2>/dev/null || true
         docker compose down 2>/dev/null || true
-        log_info "Docker 服务已停止 (MinIO + imgproxy)"
+        log_info "Docker 服务已停止 (MinIO + imgproxy + IOPaint)"
     fi
 else
     log_warn "保留 Docker 容器运行 (--keep-docker)"
